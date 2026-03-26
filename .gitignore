@@ -29,3 +29,22 @@ credentials/
 # OS
 .DS_Store
 Thumbs.db
+
+# FreeSWITCH media and storage
+*.wav
+*.mp3
+*.ogg
+freeswitch/sounds/
+freeswitch/storage/
+freeswitch/recordings/
+
+# Broken/orig config backups
+*.broken
+*.orig
+*_orig
+*.bak
+
+# Misc lab scripts
+get-docker.sh
+mv
+pre-flight-check.sh
