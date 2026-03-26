@@ -1,0 +1,67 @@
+
+groups:
+- name: voice-engineering-alerts
+  rules:
+  - alert: High4xxRate
+    expr: rate(opensips_responses_total{code=~"4.."}[1m]) > 10
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High 4xx SIP response rate"
+      description: "Check SIP registrations and routing logic."
+
+  - alert: High5xxRate
+    expr: rate(opensips_responses_total{code=~"5.."}[1m]) > 5
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High 5xx SIP response rate"
+      description: "Possible server or routing errors."
+
+  - alert: DialogsDropped
+    expr: opensips_dialogs_count < 5
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low active dialog count"
+      description: "Check SBC / PBX connectivity."
+
+  - alert: INVITESpike
+    expr: rate(opensips_requests_total{method="INVITE"}[1m]) > 20
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High INVITE rate"
+      description: "Possible traffic spike or attack."
+
+  - alert: RedisDown
+    expr: redis_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis is down"
+      description: "OpenSIPS may fail to store state."
+
+  - alert: RTPPacketLossHigh
+    expr: rate(rtpengine_packets_lost_total[1m]) / rate(rtpengine_packets_total[1m]) > 0.05
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High RTP packet loss (>5%)"
+      description: "Possible network issues affecting call quality."
+
+  - alert: RTPSessionDrop
+    expr: rtpengine_calls_active < 5
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low active RTP sessions"
+      description: "Check SBC/ PBX call routing or service status."
+

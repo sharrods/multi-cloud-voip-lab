@@ -1,0 +1,31 @@
+{
+  "id": null,
+  "uid": "service-status",
+  "title": "VoIP Service Status",
+  "tags": ["status"],
+  "timezone": "browser",
+  "schemaVersion": 27,
+  "version": 0,
+  "refresh": "5s",
+  "panels": [
+    {
+      "title": "System CPU",
+      "targets": [{"expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "refId": "A"}],
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0}
+    },
+    {
+      "title": "System Memory",
+      "targets": [{"expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100", "refId": "A"}],
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0}
+    },
+    {
+      "title": "Node Exporter Up",
+      "targets": [{"expr": "up{job=\"node\"}", "refId": "A"}],
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "red"},{"value": 1, "color": "green"}]}}}
+    }
+  ]
+}

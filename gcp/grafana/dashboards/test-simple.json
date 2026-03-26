@@ -1,0 +1,10 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "test-simple",
+    "title": "TEST Simple Dashboard",
+    "schemaVersion": 16,
+    "version": 0,
+    "panels": []
+  }
+}

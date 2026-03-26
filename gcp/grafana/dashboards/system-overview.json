@@ -1,0 +1,71 @@
+{
+  "id": null,
+  "uid": "system-overview",
+  "title": "VoIP System Overview",
+  "tags": ["system", "overview"],
+  "timezone": "browser",
+  "schemaVersion": 27,
+  "version": 0,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "OpenSIPS",
+      "gridPos": {"h": 3, "w": 6, "x": 0, "y": 0},
+      "targets": [{"expr": "opensips_up", "refId": "A"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "red"},{"value": 1, "color": "green"}]}}}
+    },
+    {
+      "type": "stat",
+      "title": "FreeSWITCH",
+      "gridPos": {"h": 3, "w": 6, "x": 6, "y": 0},
+      "targets": [{"expr": "freeswitch_up", "refId": "A"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "red"},{"value": 1, "color": "green"}]}}}
+    },
+    {
+      "type": "stat",
+      "title": "RTPEngine",
+      "gridPos": {"h": 3, "w": 6, "x": 12, "y": 0},
+      "targets": [{"expr": "rtpengine_up", "refId": "A"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "red"},{"value": 1, "color": "green"}]}}}
+    },
+    {
+      "type": "stat",
+      "title": "Redis",
+      "gridPos": {"h": 3, "w": 6, "x": 18, "y": 0},
+      "targets": [{"expr": "redis_up", "refId": "A"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "red"},{"value": 1, "color": "green"}]}}}
+    },
+    {
+      "type": "graph",
+      "title": "CPU Usage",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 3},
+      "targets": [{"expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "CPU %", "refId": "A"}],
+      "yaxes": [{"format": "percent", "label": "CPU Usage"}, {"format": "short"}]
+    },
+    {
+      "type": "graph",
+      "title": "Memory Usage",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 3},
+      "targets": [{"expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100", "legendFormat": "Memory %", "refId": "A"}],
+      "yaxes": [{"format": "percent", "label": "Memory Usage"}, {"format": "short"}]
+    },
+    {
+      "type": "graph",
+      "title": "Disk Usage",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 11},
+      "targets": [{"expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"rootfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"rootfs\"}) * 100)", "legendFormat": "Disk %", "refId": "A"}],
+      "yaxes": [{"format": "percent", "label": "Disk Usage"}, {"format": "short"}]
+    },
+    {
+      "type": "graph",
+      "title": "Network Traffic",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 11},
+      "targets": [
+        {"expr": "rate(node_network_receive_bytes_total[5m])", "legendFormat": "RX {{device}}", "refId": "A"},
+        {"expr": "rate(node_network_transmit_bytes_total[5m])", "legendFormat": "TX {{device}}", "refId": "B"}
+      ],
+      "yaxes": [{"format": "Bps", "label": "Bytes/sec"}, {"format": "short"}]
+    }
+  ]
+}

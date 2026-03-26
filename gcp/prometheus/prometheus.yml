@@ -1,0 +1,195 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'multi-cloud-voip-lab'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  # ============================================
+  # GCP VoIP Lab (Local)
+  # ============================================
+  - job_name: 'gcp-node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          cloud: gcp
+          site: site2
+          host: gcp-voip
+          role: all-in-one
+          region: us-central1
+
+  - job_name: 'gcp-opensips-exporter'
+    static_configs:
+      - targets: ['opensips-exporter:8000']
+        labels:
+          cloud: gcp
+          site: site2
+          service: opensips
+          host: gcp-voip
+
+  - job_name: 'gcp-freeswitch-exporter'
+    static_configs:
+      - targets: ['freeswitch-exporter:8000']
+        labels:
+          cloud: gcp
+          site: site2
+          service: freeswitch
+          host: gcp-voip
+
+  - job_name: 'gcp-rtpengine-exporter'
+    static_configs:
+      - targets: ['rtpengine-exporter:9092']
+        labels:
+          cloud: gcp
+          site: site2
+          service: rtpengine
+          host: gcp-voip
+
+  - job_name: 'gcp-redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          cloud: gcp
+          site: site2
+          service: redis
+          host: gcp-voip
+
+  # ============================================
+  # Oracle Cloud VoIP Lab
+  # ============================================
+  # Oracle VM1 - Signaling Server
+  - job_name: 'oracle-vm1-node'
+    static_configs:
+      - targets: ['144.24.1.61:9100']
+        labels:
+          cloud: oracle
+          site: site1
+          host: oracle-vm1
+          role: signaling
+          region: us-ashburn
+
+  - job_name: 'oracle-vm1-redis-exporter'
+    static_configs:
+      - targets: ['144.24.1.61:9121']
+        labels:
+          cloud: oracle
+          site: site1
+          service: redis
+          host: oracle-vm1
+
+  - job_name: 'oracle-vm1-opensips-exporter'
+    static_configs:
+      - targets: ['144.24.1.61:9153']
+        labels:
+          cloud: oracle
+          site: site1
+          service: opensips
+          host: oracle-vm1
+
+  # Oracle VM2 - Media Server
+  - job_name: 'oracle-vm2-node'
+    static_configs:
+      - targets: ['141.148.155.33:9100']
+        labels:
+          cloud: oracle
+          site: site1
+          host: oracle-vm2
+          role: media
+          region: us-ashburn
+
+  - job_name: 'oracle-vm2-freeswitch-exporter'
+    static_configs:
+      - targets: ['141.148.155.33:9282']
+        labels:
+          cloud: oracle
+          site: site1
+          service: freeswitch
+          host: oracle-vm2
+
+  - job_name: 'oracle-vm2-rtpengine-exporter'
+    static_configs:
+      - targets: ['141.148.155.33:9092']
+        labels:
+          cloud: oracle
+          site: site1
+          service: rtpengine
+          host: oracle-vm2
+
+  # ============================================
+  # AWS VoIP Lab
+  # ============================================
+  - job_name: 'aws-signaling-node'
+    static_configs:
+      - targets: ['44.193.172.237:9100']
+        labels:
+          cloud: aws
+          site: site3
+          host: aws-signaling
+          role: signaling
+          region: us-east-1
+
+  - job_name: 'aws-media-node'
+    static_configs:
+      - targets: ['13.216.104.26:9100']
+        labels:
+          cloud: aws
+          site: site3
+          host: aws-media
+          role: media
+          region: ap-southeast-1
+
+  - job_name: 'aws-rtpengine-exporter'
+    static_configs:
+      - targets: ['13.216.104.26:9092']
+        labels:
+          cloud: aws
+          site: site3
+          service: rtpengine
+          host: aws-media
+          region: ap-southeast-1
+
+  # Prometheus Self
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          cloud: gcp
+          service: prometheus
+          host: gcp-voip
+
+  # ============================================
+  # AWS VoIP Exporters
+  # ============================================
+  - job_name: 'aws-opensips-exporter'
+    static_configs:
+      - targets: ['44.193.172.237:9153']
+        labels:
+          cloud: aws
+          site: site3
+          service: opensips
+          host: aws-signaling
+          region: us-east-1
+
+  - job_name: 'aws-freeswitch-exporter'
+    static_configs:
+      - targets: ['13.216.104.26:9282']
+        labels:
+          cloud: aws
+          site: site3
+          service: freeswitch
+          host: aws-media
+          region: ap-southeast-1
+
+
+
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'

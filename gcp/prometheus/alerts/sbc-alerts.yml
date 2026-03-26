@@ -1,0 +1,75 @@
+groups:
+  - name: sbc_alerts
+    interval: 30s
+    rules:
+      # Service Down Alerts
+      - alert: OpenSIPSDown
+        expr: opensips_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: opensips
+        annotations:
+          summary: "OpenSIPS is down"
+          description: "OpenSIPS has been down for more than 1 minute"
+
+      - alert: FreeSWITCHDown
+        expr: freeswitch_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: freeswitch
+        annotations:
+          summary: "FreeSWITCH is down"
+          description: "FreeSWITCH has been down for more than 1 minute"
+
+      - alert: RTPEngineDown
+        expr: rtpengine_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: rtpengine
+        annotations:
+          summary: "RTPEngine is down"
+          description: "RTPEngine has been down for more than 1 minute"
+
+      # High Load Alerts
+      - alert: HighCallVolume
+        expr: freeswitch_calls_total > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: freeswitch
+        annotations:
+          summary: "High call volume detected"
+          description: "More than 100 concurrent calls for 5 minutes"
+
+      - alert: HighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% for 5 minutes"
+
+      - alert: HighMemory
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 90% for 5 minutes"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is below 10%"
