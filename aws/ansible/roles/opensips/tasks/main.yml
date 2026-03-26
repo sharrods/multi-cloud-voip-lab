@@ -24,6 +24,12 @@
     image: "opensips/opensips:{{ opensips_version }}"
     state: started
     restart_policy: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "opensips-cli -x mi uptime | grep -q 'Up time' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s 
     network_mode: host
     volumes:
       - /home/{{ ansible_user }}/voiplab/opensips/opensips.cfg:/etc/opensips/opensips.cfg:ro

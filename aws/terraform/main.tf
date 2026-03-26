@@ -203,27 +203,27 @@ resource "aws_key_pair" "voip_key" {
 # AMI Data Source (Latest Ubuntu 22.04)
 # ------------------------------------------------------------------------------
 
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"] # Canonical
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
+# data "aws_ami" "ubuntu" {
+#   most_recent = true
+#   owners      = ["099720109477"] # Canonical
+# 
+#   filter {
+#     name   = "name"
+#     values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+#   }
+# 
+#   filter {
+#     name   = "virtualization-type"
+#     values = ["hvm"]
+#   }
+# }
 
 # ------------------------------------------------------------------------------
 # EC2 Instance - Signaling VM
 # ------------------------------------------------------------------------------
 
 resource "aws_instance" "signaling" {
-  ami                    = data.aws_ami.ubuntu.id
+  ami                    = "ami-04680790a315cd58d" 
   instance_type          = var.instance_type
   key_name               = aws_key_pair.voip_key.key_name
   subnet_id              = aws_subnet.voip_subnet.id
@@ -265,7 +265,7 @@ resource "aws_eip" "signaling_eip" {
 # ------------------------------------------------------------------------------
 
 resource "aws_instance" "media" {
-  ami                    = data.aws_ami.ubuntu.id
+  ami                    = "ami-04680790a315cd58d" 
   instance_type          = var.instance_type
   key_name               = aws_key_pair.voip_key.key_name
   subnet_id              = aws_subnet.voip_subnet.id

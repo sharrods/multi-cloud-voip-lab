@@ -73,13 +73,13 @@ variable "oracle_vm2_ip" {
 variable "gcp_ip" {
   description = "GCP VM public IP"
   type        = string
-  default     = "34.172.210.177/32"
+  default     = "34.44.206.214/32"
 }
 
 variable "gcp_monitoring_ip" {
   description = "GCP Prometheus IP for metrics collection"
   type        = string
-  default     = "34.172.210.177/32"
+  default     = "34.44.206.214/32"
 }
 
 variable "azure_ip" {
@@ -112,7 +112,7 @@ variable "prometheus_allowed_ips" {
   description = "IPs allowed to scrape Prometheus exporters"
   type        = list(string)
   default     = [
-    "34.172.210.177/32",  # GCP Prometheus
+    "34.44.206.214/32",  # GCP Prometheus
     "4.235.114.198/32"   # Azure management
   ]
 }
