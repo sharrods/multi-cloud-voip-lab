@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+
+<!-- 
+  Standalone 305 Redirect UAC Scenario
+  
+  This UAC works with ANY remote UAS/SBC that sends 305 responses.
+  It will:
+  1. Send INVITE to remote target
+  2. Handle 305 response from remote UAS
+  3. Extract Contact header from 305
+  4. Send new INVITE to the redirect target
+  5. Complete the call
+  
+  Usage:
+  sipp <remote_uas_ip>:<port> -sf redirect_uac_standalone.xml -m 100 -r 5
+-->
+
+<scenario name="305 Redirect UAC - Standalone">
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 1: Initial INVITE to remote UAS -->
+  <!-- ====================================================================== -->
+  
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:caller@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[service]@[remote_ip]:[remote_port]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:caller@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Subject: Redirect Test Call
+      User-Agent: SIPp-Redirect-UAC
+      Allow: INVITE, ACK, BYE, CANCEL, OPTIONS, PRACK, UPDATE, INFO
+      Supported: 100rel, timer
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 0 8 101
+      a=rtpmap:0 PCMU/8000
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-15
+      a=sendrecv
+    ]]>
+  </send>
+
+  <!-- Receive 100 Trying (optional) -->
+  <recv response="100" optional="true" timeout="5000">
+  </recv>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 2: Receive and process 305 Use Proxy response -->
+  <!-- ====================================================================== -->
+  
+  <recv response="305" crlf="true" timeout="10000">
+    <action>
+      <!-- Extract redirect target from Contact header -->
+      <!-- Format: Contact: <sip:user@host:port> or Contact: <sip:host:port> -->
+      
+      <!-- Try to extract user@host:port format -->
+      <ereg regexp="Contact:.*&lt;sip:([^@]+)@([^:;>]+):?([0-9]*)" 
+            search_in="msg" 
+            assign_to="dummy,redirect_user,redirect_host,redirect_port" 
+            check_it="true" />
+      
+      <!-- If that fails, try host:port format (no user part) -->
+      <ereg regexp="Contact:.*&lt;sip:([^:;>]+):?([0-9]*)" 
+            search_in="msg" 
+            assign_to="dummy2,redirect_host_alt,redirect_port_alt" 
+            check_it="true" />
+      
+      <!-- Extract To user for the redirected call -->
+      <ereg regexp="To:.*&lt;sip:([^@>]+)" 
+            search_in="msg" 
+            assign_to="dummy3,original_to_user" />
+      
+      <log message="=== 305 REDIRECT RECEIVED ==="/>
+      <log message="Redirect to: [redirect_user]@[redirect_host]:[redirect_port]"/>
+      <log message="Alternative: [redirect_host_alt]:[redirect_port_alt]"/>
+    </action>
+  </recv>
+
+  <!-- Send ACK to 305 response -->
+  <send>
+    <![CDATA[
+      ACK sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:caller@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      [last_To:]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Brief pause before redirecting -->
+  <pause milliseconds="500"/>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 3: Send new INVITE to redirected target -->
+  <!-- ====================================================================== -->
+  
+  <!-- Label for conditional processing -->
+  <label id="send_redirected_invite"/>
+  
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:[redirect_user]@[redirect_host]:[redirect_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]-redirect
+      From: <sip:caller@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[redirect_user]@[redirect_host]:[redirect_port]>
+      Call-ID: [call_id]-redirect
+      CSeq: 1 INVITE
+      Contact: <sip:caller@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 69
+      Subject: Redirected Call
+      User-Agent: SIPp-Redirect-UAC
+      Allow: INVITE, ACK, BYE, CANCEL, OPTIONS, PRACK, UPDATE, INFO
+      Supported: 100rel, timer
+      Diversion: <sip:[service]@[remote_ip]:[remote_port]>;reason=unconditional
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 0 8 101
+      a=rtpmap:0 PCMU/8000
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-15
+      a=sendrecv
+    ]]>
+  </send>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 4: Handle redirected call responses -->
+  <!-- ====================================================================== -->
+
+  <!-- Receive 100 Trying for redirected INVITE -->
+  <recv response="100" optional="true" timeout="5000">
+    <action>
+      <log message="Redirected call: Received 100 Trying"/>
+    </action>
+  </recv>
+
+  <!-- Receive 180 Ringing for redirected INVITE -->
+  <recv response="180" optional="true" timeout="10000">
+    <action>
+      <log message="Redirected call: Ringing"/>
+    </action>
+  </recv>
+
+  <!-- Receive 183 Session Progress (optional) -->
+  <recv response="183" optional="true" timeout="5000">
+    <action>
+      <log message="Redirected call: Session Progress"/>
+    </action>
+  </recv>
+
+  <!-- Receive 200 OK for redirected INVITE -->
+  <recv response="200" rtd="true" crlf="true" timeout="30000">
+    <action>
+      <log message="=== REDIRECTED CALL ANSWERED ==="/>
+      <log message="Call successfully completed via redirect"/>
+    </action>
+  </recv>
+
+  <!-- Send ACK to 200 OK -->
+  <send>
+    <![CDATA[
+      ACK sip:[redirect_user]@[redirect_host]:[redirect_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]-redirect-ack
+      From: <sip:caller@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      [last_To:]
+      Call-ID: [call_id]-redirect
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 5: Hold call and terminate -->
+  <!-- ====================================================================== -->
+
+  <!-- Hold the call for configured duration (default 5 seconds) -->
+  <pause milliseconds="5000"/>
+
+  <!-- Send BYE to terminate call -->
+  <send retrans="500">
+    <![CDATA[
+      BYE sip:[redirect_user]@[redirect_host]:[redirect_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]-bye
+      From: <sip:caller@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      [last_To:]
+      Call-ID: [call_id]-redirect
+      CSeq: 2 BYE
+      Max-Forwards: 70
+      User-Agent: SIPp-Redirect-UAC
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Receive 200 OK for BYE -->
+  <recv response="200" crlf="true" timeout="5000">
+    <action>
+      <log message="Call terminated successfully"/>
+    </action>
+  </recv>
+
+  <!-- ====================================================================== -->
+  <!-- Statistics and Performance Tracking -->
+  <!-- ====================================================================== -->
+
+  <ResponseTimeRepartition value="10, 20, 30, 40, 50, 100, 150, 200, 500, 1000, 2000"/>
+  <CallLengthRepartition value="1000, 2000, 3000, 4000, 5000, 10000, 20000, 30000"/>
+
+</scenario>

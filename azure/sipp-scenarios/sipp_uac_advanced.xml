@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+
+<!-- 
+  Advanced SIPP UAC Scenario
+  Features:
+  - Proper Record-Route/Contact handling
+  - re-INVITE support (mid-call updates)
+  - Error handling (4xx, 5xx, 6xx responses)
+  - Retransmission handling
+  - Optional provisional responses
+-->
+
+<scenario name="Advanced UAC with Route Set">
+  
+  <!-- ============================================ -->
+  <!-- INITIAL INVITE                               -->
+  <!-- ============================================ -->
+  <send retrans="500">
+    <![CDATA[
+
+      INVITE sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[service]@[remote_ip]:[remote_port]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Subject: SIPP Test Call
+      User-Agent: SIPp/[version]
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP4 [local_ip]
+      s=-
+      c=IN IP4 [local_ip]
+      t=0 0
+      m=audio 6000 RTP/AVP 0 8 101
+      a=rtpmap:0 PCMU/8000
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-15
+      a=sendrecv
+
+    ]]>
+  </send>
+
+  <!-- ============================================ -->
+  <!-- PROVISIONAL RESPONSES (Optional)             -->
+  <!-- ============================================ -->
+  <recv response="100" optional="true"></recv>
+  <recv response="180" optional="true"></recv>
+  <recv response="183" optional="true"></recv>
+
+  <!-- ============================================ -->
+  <!-- HANDLE 200 OK                                -->
+  <!-- ============================================ -->
+  <recv response="200" rtd="true">
+    <action>
+      <!-- Store To header with tag for subsequent requests -->
+      <ereg regexp=".*" search_in="hdr" header="To:" assign_to="remote_to_hdr" />
+      
+      <!-- SIPP auto-populates these variables from 200 OK:
+           [next_url]  - from Contact header
+           [routes]    - from Record-Route headers (auto-reversed)
+           [remote_tag] - from To tag
+      -->
+      
+      <log message="=== Dialog Established ==="/>
+      <log message="Call-ID: [call_id]"/>
+      <log message="Local tag: [pid]SIPpTag00[call_number]"/>
+      <log message="Remote tag: [remote_tag]"/>
+      <log message="Contact (next_url): [next_url]"/>
+      <log message="Route set: [routes]"/>
+    </action>
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- SEND ACK (Critical for dialog establishment) -->
+  <!-- ============================================ -->
+  <send>
+    <![CDATA[
+
+      ACK [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      [routes]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: [$remote_to_hdr]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- ============================================ -->
+  <!-- CALL ESTABLISHED - Wait before re-INVITE    -->
+  <!-- ============================================ -->
+  <pause milliseconds="5000"/>
+
+  <!-- ============================================ -->
+  <!-- OPTIONAL: Send re-INVITE (test hold/resume) -->
+  <!-- ============================================ -->
+  <send retrans="500">
+    <![CDATA[
+
+      INVITE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      [routes]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: [$remote_to_hdr]
+      Call-ID: [call_id]
+      CSeq: 2 INVITE
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687638 IN IP4 [local_ip]
+      s=-
+      c=IN IP4 [local_ip]
+      t=0 0
+      m=audio 6000 RTP/AVP 0 8 101
+      a=rtpmap:0 PCMU/8000
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-15
+      a=sendrecv
+
+    ]]>
+  </send>
+
+  <!-- Handle re-INVITE responses -->
+  <recv response="100" optional="true"></recv>
+  <recv response="200">
+    <action>
+      <!-- Update route set if Record-Route changed -->
+      <log message="re-INVITE successful"/>
+    </action>
+  </recv>
+
+  <!-- Send ACK for re-INVITE -->
+  <send>
+    <![CDATA[
+
+      ACK [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      [routes]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: [$remote_to_hdr]
+      Call-ID: [call_id]
+      CSeq: 2 ACK
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- ============================================ -->
+  <!-- Wait before hanging up                      -->
+  <!-- ============================================ -->
+  <pause milliseconds="20000"/>
+
+  <!-- ============================================ -->
+  <!-- SEND BYE                                     -->
+  <!-- ============================================ -->
+  <send retrans="500">
+    <![CDATA[
+
+      BYE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      [routes]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: [$remote_to_hdr]
+      Call-ID: [call_id]
+      CSeq: 3 BYE
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- ============================================ -->
+  <!-- RECEIVE 200 OK FOR BYE                       -->
+  <!-- ============================================ -->
+  <recv response="200" crlf="true">
+    <action>
+      <log message="Call terminated successfully"/>
+    </action>
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- ERROR HANDLING: 4xx, 5xx, 6xx                -->
+  <!-- ============================================ -->
+  
+  <!-- 401/407 Authentication Required -->
+  <recv response="401" optional="true">
+    <action>
+      <log message="Authentication required but not supported in this scenario"/>
+    </action>
+  </recv>
+
+  <recv response="407" optional="true">
+    <action>
+      <log message="Proxy authentication required but not supported"/>
+    </action>
+  </recv>
+
+  <!-- 404 Not Found -->
+  <recv response="404" optional="true">
+    <action>
+      <log message="404 Not Found - User does not exist"/>
+    </action>
+  </recv>
+
+  <!-- 486 Busy Here -->
+  <recv response="486" optional="true">
+    <action>
+      <log message="486 Busy Here - User is busy"/>
+    </action>
+  </recv>
+
+  <!-- 487 Request Terminated (CANCEL received) -->
+  <recv response="487" optional="true">
+    <action>
+      <log message="487 Request Terminated"/>
+    </action>
+  </recv>
+
+  <!-- Generic 4xx -->
+  <recv response="4[0-9][0-9]" optional="true">
+    <action>
+      <log message="Received 4xx error response"/>
+    </action>
+  </recv>
+
+  <!-- Generic 5xx -->
+  <recv response="5[0-9][0-9]" optional="true">
+    <action>
+      <log message="Received 5xx server error"/>
+    </action>
+  </recv>
+
+  <!-- Generic 6xx -->
+  <recv response="6[0-9][0-9]" optional="true">
+    <action>
+      <log message="Received 6xx global failure"/>
+    </action>
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- STATISTICS                                   -->
+  <!-- ============================================ -->
+  <ResponseTimeRepartition value="10, 20, 30, 40, 50, 100, 150, 200"/>
+  <CallLengthRepartition value="10, 50, 100, 500, 1000, 5000, 10000"/>
+
+</scenario>

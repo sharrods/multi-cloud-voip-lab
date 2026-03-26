@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+
+<!-- 
+  Corrected SIPP UAC Scenario
+  Properly handles:
+  - Record-Route headers (builds route set)
+  - Contact headers (uses for Request-URI)
+  - In-dialog request routing (ACK, BYE)
+-->
+
+<scenario name="UAC with Proper Route Set Handling">
+  
+  <!-- ============================================ -->
+  <!-- Step 1: Send INVITE                          -->
+  <!-- ============================================ -->
+  <send retrans="500">
+    <![CDATA[
+
+      INVITE sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[service]@[remote_ip]:[remote_port]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Subject: Performance Test
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP4 [local_ip]
+      s=-
+      c=IN IP4 [local_ip]
+      t=0 0
+      m=audio 6000 RTP/AVP 0 8 101
+      a=rtpmap:0 PCMU/8000
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-15
+
+    ]]>
+  </send>
+
+  <!-- ============================================ -->
+  <!-- Step 2: Receive 100 Trying (Optional)        -->
+  <!-- ============================================ -->
+  <recv response="100" optional="true">
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- Step 3: Receive 180 Ringing (Optional)       -->
+  <!-- ============================================ -->
+  <recv response="180" optional="true">
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- Step 4: Receive 183 Session Progress (Opt)   -->
+  <!-- ============================================ -->
+  <recv response="183" optional="true">
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- Step 5: Receive 200 OK                       -->
+  <!-- ============================================ -->
+  <recv response="200" rtd="true">
+    <action>
+      <!-- 
+        CRITICAL: Extract Contact header for Request-URI
+        The [next_url] variable is automatically populated by SIPP
+        from the Contact header in the 200 OK
+      -->
+      
+      <!-- 
+        CRITICAL: Extract Record-Route headers for Route
+        The [routes] variable is automatically populated by SIPP
+        from Record-Route headers in the 200 OK (reversed order)
+      -->
+      
+      <!-- Store remote tag for dialog matching -->
+      <ereg regexp=".*" search_in="hdr" header="To:" assign_to="remote_to_hdr" />
+      
+      <!-- Log what we extracted (for debugging) -->
+      <log message="Dialog established: Call-ID=[call_id] From-tag=[pid]SIPpTag00[call_number] To-tag=[remote_tag]"/>
+      <log message="Contact (next_url): [next_url]"/>
+      <log message="Route set (routes): [routes]"/>
+    </action>
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- Step 6: Send ACK (In-Dialog)                 -->
+  <!-- ============================================ -->
+  <send>
+    <![CDATA[
+
+      ACK [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      [routes]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: [$remote_to_hdr]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- ============================================ -->
+  <!-- Step 7: Wait for call duration               -->
+  <!-- ============================================ -->
+  <pause milliseconds="30000"/>
+
+  <!-- ============================================ -->
+  <!-- Step 8: Send BYE (In-Dialog)                 -->
+  <!-- ============================================ -->
+  <send retrans="500">
+    <![CDATA[
+
+      BYE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      [routes]
+      From: sipp <sip:sipp@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: [$remote_to_hdr]
+      Call-ID: [call_id]
+      CSeq: 2 BYE
+      Contact: sip:sipp@[local_ip]:[local_port]
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- ============================================ -->
+  <!-- Step 9: Receive 200 OK for BYE               -->
+  <!-- ============================================ -->
+  <recv response="200" crlf="true">
+  </recv>
+
+  <!-- ============================================ -->
+  <!-- Statistics and Response Time                 -->
+  <!-- ============================================ -->
+  <ResponseTimeRepartition value="10, 20, 30, 40, 50, 100, 150, 200"/>
+  <CallLengthRepartition value="10, 50, 100, 500, 1000, 5000, 10000"/>
+
+</scenario>

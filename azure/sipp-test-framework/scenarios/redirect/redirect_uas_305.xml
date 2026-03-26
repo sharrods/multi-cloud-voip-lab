@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+
+<!-- 
+  305 Redirect UAS Scenario
+  This UAS receives INVITE and responds with 305 Use Proxy
+  The Contact header contains the redirect target
+-->
+
+<scenario name="305 Redirect UAS">
+  
+  <!-- Receive INVITE -->
+  <recv request="INVITE" crlf="true">
+    <action>
+      <ereg regexp="sip:([^@]+)@" search_in="hdr" header="From:" assign_to="dummy,from_user" />
+      <ereg regexp="sip:([^@]+)@" search_in="hdr" header="To:" assign_to="dummy,to_user" />
+      <log message="Received INVITE from [from_user] to [to_user]"/>
+    </action>
+  </recv>
+
+  <!-- Send 100 Trying -->
+  <send>
+    <![CDATA[
+      SIP/2.0 100 Trying
+      [last_Via:]
+      [last_From:]
+      [last_To:]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Send 305 Use Proxy with Contact header pointing to redirect target -->
+  <send>
+    <![CDATA[
+      SIP/2.0 305 Use Proxy
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[pid]SIPpTag01[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[to_user]@[redirect_target]:[redirect_port];transport=UDP>
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Receive ACK -->
+  <recv request="ACK" 
+        optional="true"
+        timeout="5000"
+        crlf="true">
+  </recv>
+
+  <!-- Wait a bit before ending -->
+  <pause milliseconds="1000"/>
+
+  <!-- Track successful redirect response -->
+  <ResponseTimeRepartition value="10, 20, 30, 40, 50, 100, 150, 200"/>
+  <CallLengthRepartition value="10, 50, 100, 500, 1000, 5000, 10000"/>
+
+</scenario>

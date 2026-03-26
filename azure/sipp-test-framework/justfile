@@ -1,0 +1,329 @@
+# SIPP Test Framework - Main Justfile
+# Usage: just <command> [args]
+
+# Default variables
+export TIMESTAMP := `date +%Y%m%d_%H%M%S`
+export RESULTS_DIR := "results"
+export LOGS_DIR := "logs"
+export SCENARIOS_DIR := "scenarios"
+export CONFIGS_DIR := "configs"
+
+# Load configuration
+set dotenv-load := true
+
+# Default recipe - show help
+default:
+    @just --list
+
+# ============================================================================
+# SETUP & CONFIGURATION
+# ============================================================================
+
+# Initialize test environment
+init:
+    @echo "Initializing SIPP test framework..."
+    @bash scripts/setup_env.sh
+    @echo "Framework initialized successfully"
+
+# Validate test environment
+validate:
+    @echo "Validating test environment..."
+    @bash scripts/validate_env.sh
+
+# Clean all logs and results
+clean:
+    @echo "Cleaning logs and temporary files..."
+    rm -rf {{LOGS_DIR}}/*/*.log {{LOGS_DIR}}/*/*.csv
+    @echo "Clean complete"
+
+# Clean everything including results
+clean-all:
+    @echo "Cleaning all logs, results, and reports..."
+    rm -rf {{LOGS_DIR}}/*/* {{RESULTS_DIR}}/*/* reports/*
+    @echo "Clean complete"
+
+# ============================================================================
+# INDIVIDUAL SCENARIO TESTING
+# ============================================================================
+
+# Run a specific scenario by name
+run-scenario scenario target="127.0.0.1:5060" rate="10" duration="60":
+    @echo "Running scenario: {{scenario}}"
+    @bash scripts/run_single_scenario.sh "{{scenario}}" "{{target}}" "{{rate}}" "{{duration}}"
+
+# List all available scenarios
+list-scenarios:
+    @echo "Available scenarios:"
+    @find {{SCENARIOS_DIR}} -name "*.xml" -exec basename {} .xml \;
+
+# ============================================================================
+# BASIC CALL TESTS
+# ============================================================================
+
+# Basic UAC (caller) test
+test-basic-uac target="127.0.0.1:5060" rate="10" calls="100":
+    @echo "Running basic UAC test..."
+    @just run-test "basic_uac" "{{target}}" "{{rate}}" "{{calls}}" "functional"
+
+# Basic UAS (receiver) test  
+test-basic-uas port="5070":
+    @echo "Running basic UAS test on port {{port}}..."
+    @just run-uas "basic_uas" "{{port}}" "functional"
+
+# UAC with authentication
+test-auth-uac target="127.0.0.1:5060" user="test" pass="test123":
+    @echo "Running authenticated UAC test..."
+    @just run-test-auth "auth_uac" "{{target}}" "{{user}}" "{{pass}}" "functional"
+
+# ============================================================================
+# 305 REDIRECT SCENARIO
+# ============================================================================
+
+# Test 305 redirect flow (UAS sends 305, UAC follows redirect)
+test-redirect target="127.0.0.1:5060" rate="5" calls="50":
+    @echo "Running 305 redirect test..."
+    @just run-redirect-test "{{target}}" "{{rate}}" "{{calls}}"
+
+# Run redirect UAS (sends 305 with Contact header)
+run-redirect-uas port="5070":
+    @echo "Starting redirect UAS on port {{port}}..."
+    @bash scripts/run_redirect_uas.sh "{{port}}"
+
+# ============================================================================
+# ERROR TESTING
+# ============================================================================
+
+# Test various error responses (4xx, 5xx, 6xx)
+test-errors target="127.0.0.1:5060":
+    @echo "Running error response tests..."
+    @just run-scenario "error_4xx" "{{target}}" "5" "30"
+    @just run-scenario "error_5xx" "{{target}}" "5" "30"
+    @just run-scenario "error_6xx" "{{target}}" "5" "30"
+    @bash scripts/collect_stats.sh "error" "{{TIMESTAMP}}"
+
+# Test timeout scenarios
+test-timeouts target="127.0.0.1:5060":
+    @echo "Running timeout tests..."
+    @just run-scenario "timeout_no_response" "{{target}}" "2" "60"
+    @bash scripts/collect_stats.sh "error" "{{TIMESTAMP}}"
+
+# Test malformed SIP messages
+test-malformed target="127.0.0.1:5060":
+    @echo "Running malformed message tests..."
+    @just run-scenario "malformed_invite" "{{target}}" "1" "30"
+    @bash scripts/collect_stats.sh "error" "{{TIMESTAMP}}"
+
+# Run all error tests
+test-all-errors target="127.0.0.1:5060":
+    @echo "Running complete error test suite..."
+    @just test-errors "{{target}}"
+    @just test-timeouts "{{target}}"
+    @just test-malformed "{{target}}"
+    @bash scripts/generate_report.sh "error" "{{TIMESTAMP}}"
+
+# ============================================================================
+# CAPACITY & PERFORMANCE TESTING
+# ============================================================================
+
+# CPS (Calls Per Second) ramp test
+test-cps target="127.0.0.1:5060" max_cps="100" step="10" duration="300":
+    @echo "Running CPS ramp test (max: {{max_cps}} cps)..."
+    @bash scripts/run_cps_test.sh "{{target}}" "{{max_cps}}" "{{step}}" "{{duration}}"
+    @bash scripts/collect_stats.sh "cps" "{{TIMESTAMP}}"
+
+# Sustained load test
+test-capacity target="127.0.0.1:5060" cps="50" duration="3600" max_calls="1000":
+    @echo "Running capacity test ({{cps}} cps for {{duration}}s)..."
+    @bash scripts/run_capacity_test.sh "{{target}}" "{{cps}}" "{{duration}}" "{{max_calls}}"
+    @bash scripts/collect_stats.sh "capacity" "{{TIMESTAMP}}"
+
+# Stress test - push to failure
+test-stress target="127.0.0.1:5060" start_cps="10" max_cps="500":
+    @echo "Running stress test..."
+    @bash scripts/run_stress_test.sh "{{target}}" "{{start_cps}}" "{{max_cps}}"
+    @bash scripts/collect_stats.sh "capacity" "{{TIMESTAMP}}"
+
+# ============================================================================
+# REGRESSION TESTING
+# ============================================================================
+
+# Full regression suite
+test-regression target="127.0.0.1:5060":
+    @echo "=========================================="
+    @echo "STARTING FULL REGRESSION TEST SUITE"
+    @echo "Target: {{target}}"
+    @echo "Timestamp: {{TIMESTAMP}}"
+    @echo "=========================================="
+    @just test-basic-uac "{{target}}" "10" "100"
+    @just test-auth-uac "{{target}}" "testuser" "testpass"
+    @just test-redirect "{{target}}" "5" "50"
+    @just test-errors "{{target}}"
+    @just test-cps "{{target}}" "50" "5" "120"
+    @bash scripts/collect_stats.sh "regression" "{{TIMESTAMP}}"
+    @bash scripts/generate_report.sh "regression" "{{TIMESTAMP}}"
+    @echo "=========================================="
+    @echo "REGRESSION TEST SUITE COMPLETE"
+    @echo "Results: {{RESULTS_DIR}}/regression/{{TIMESTAMP}}"
+    @echo "=========================================="
+
+# Quick regression (subset of tests)
+test-regression-quick target="127.0.0.1:5060":
+    @echo "Running quick regression tests..."
+    @just test-basic-uac "{{target}}" "10" "50"
+    @just test-auth-uac "{{target}}" "testuser" "testpass"
+    @just test-redirect "{{target}}" "5" "25"
+    @bash scripts/collect_stats.sh "regression" "{{TIMESTAMP}}"
+    @bash scripts/generate_report.sh "regression" "{{TIMESTAMP}}"
+
+# ============================================================================
+# ADVANCED SCENARIOS
+# ============================================================================
+
+# Test PRACK (Reliable Provisional Responses)
+test-prack target="127.0.0.1:5060" rate="5" calls="50":
+    @echo "Running PRACK test..."
+    @just run-scenario "prack_flow" "{{target}}" "{{rate}}" "{{calls}}"
+
+# Test UPDATE method
+test-update target="127.0.0.1:5060" rate="5" calls="50":
+    @echo "Running UPDATE test..."
+    @just run-scenario "update_flow" "{{target}}" "{{rate}}" "{{calls}}"
+
+# Test re-INVITE (session modification)
+test-reinvite target="127.0.0.1:5060" rate="5" calls="50":
+    @echo "Running re-INVITE test..."
+    @just run-scenario "reinvite_flow" "{{target}}" "{{rate}}" "{{calls}}"
+
+# Test call transfer (REFER)
+test-refer target="127.0.0.1:5060" rate="3" calls="30":
+    @echo "Running REFER (call transfer) test..."
+    @just run-scenario "refer_flow" "{{target}}" "{{rate}}" "{{calls}}"
+
+# ============================================================================
+# CODEC & RTP TESTS
+# ============================================================================
+
+# Test multiple codec scenarios
+test-codecs target="127.0.0.1:5060":
+    @echo "Running codec negotiation tests..."
+    @just run-scenario "codec_g711" "{{target}}" "5" "30"
+    @just run-scenario "codec_g729" "{{target}}" "5" "30"
+    @just run-scenario "codec_opus" "{{target}}" "5" "30"
+    @bash scripts/collect_stats.sh "functional" "{{TIMESTAMP}}"
+
+# Test RTP with media
+test-rtp target="127.0.0.1:5060" rate="10" calls="50":
+    @echo "Running RTP media test..."
+    @just run-scenario "rtp_media" "{{target}}" "{{rate}}" "{{calls}}"
+
+# ============================================================================
+# HELPER RECIPES
+# ============================================================================
+
+# Internal: Run test with stats collection
+run-test scenario target rate calls result_type:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    TEST_ID="{{scenario}}_{{TIMESTAMP}}"
+    LOG_DIR="{{LOGS_DIR}}/{{result_type}}/$TEST_ID"
+    mkdir -p "$LOG_DIR"
+    
+    sipp {{target}} \
+        -sf {{SCENARIOS_DIR}}/{{scenario}}.xml \
+        -r {{rate}} \
+        -m {{calls}} \
+        -trace_msg -message_file "$LOG_DIR/messages.log" \
+        -trace_screen -screen_file "$LOG_DIR/screen.log" \
+        -trace_err -error_file "$LOG_DIR/error.log" \
+        -trace_stat -stf "$LOG_DIR/stats.csv" \
+        -trace_counts \
+        -trace_rtt \
+        -fd 1 \
+        -timeout 60s \
+        -timeout_error \
+        -default_behaviors none
+    
+    bash scripts/parse_logs.sh "$LOG_DIR" "{{result_type}}" "{{TIMESTAMP}}"
+
+# Internal: Run authenticated test
+run-test-auth scenario target user pass result_type:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    TEST_ID="{{scenario}}_{{TIMESTAMP}}"
+    LOG_DIR="{{LOGS_DIR}}/{{result_type}}/$TEST_ID"
+    mkdir -p "$LOG_DIR"
+    
+    sipp {{target}} \
+        -sf {{SCENARIOS_DIR}}/{{scenario}}.xml \
+        -au {{user}} \
+        -ap {{pass}} \
+        -r 10 \
+        -m 100 \
+        -trace_msg -message_file "$LOG_DIR/messages.log" \
+        -trace_screen -screen_file "$LOG_DIR/screen.log" \
+        -trace_err -error_file "$LOG_DIR/error.log" \
+        -trace_stat -stf "$LOG_DIR/stats.csv"
+    
+    bash scripts/parse_logs.sh "$LOG_DIR" "{{result_type}}" "{{TIMESTAMP}}"
+
+# Internal: Run UAS (server mode)
+run-uas scenario port result_type:
+    #!/usr/bin/env bash
+    TEST_ID="{{scenario}}_{{TIMESTAMP}}"
+    LOG_DIR="{{LOGS_DIR}}/{{result_type}}/$TEST_ID"
+    mkdir -p "$LOG_DIR"
+    
+    sipp -sn uas \
+        -p {{port}} \
+        -trace_msg -message_file "$LOG_DIR/messages.log" \
+        -trace_screen -screen_file "$LOG_DIR/screen.log" \
+        -trace_err -error_file "$LOG_DIR/error.log"
+
+# Internal: Run redirect test
+run-redirect-test target rate calls:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    TEST_ID="redirect_test_{{TIMESTAMP}}"
+    LOG_DIR="{{LOGS_DIR}}/functional/$TEST_ID"
+    mkdir -p "$LOG_DIR"
+    
+    # Start redirect UAS in background
+    sipp -p 5070 \
+        -sf {{SCENARIOS_DIR}}/redirect/redirect_uas_305.xml \
+        -trace_msg -message_file "$LOG_DIR/uas_messages.log" \
+        -trace_screen -screen_file "$LOG_DIR/uas_screen.log" &
+    UAS_PID=$!
+    
+    sleep 2
+    
+    # Run UAC that handles redirects
+    sipp {{target}} \
+        -sf {{SCENARIOS_DIR}}/redirect/redirect_uac.xml \
+        -r {{rate}} \
+        -m {{calls}} \
+        -trace_msg -message_file "$LOG_DIR/uac_messages.log" \
+        -trace_screen -screen_file "$LOG_DIR/uac_screen.log" \
+        -trace_err -error_file "$LOG_DIR/error.log" \
+        -trace_stat -stf "$LOG_DIR/stats.csv"
+    
+    kill $UAS_PID 2>/dev/null || true
+    bash scripts/parse_logs.sh "$LOG_DIR" "functional" "{{TIMESTAMP}}"
+
+# Generate consolidated report
+report test_type timestamp:
+    @echo "Generating report for {{test_type}} - {{timestamp}}..."
+    @bash scripts/generate_report.sh "{{test_type}}" "{{timestamp}}"
+    @echo "Report generated: reports/{{test_type}}_{{timestamp}}.html"
+
+# View latest report
+view-report test_type:
+    @bash scripts/view_report.sh "{{test_type}}"
+
+# Archive old results
+archive days="30":
+    @echo "Archiving results older than {{days}} days..."
+    @bash scripts/archive_results.sh "{{days}}"
+
+# Show test statistics summary
+stats:
+    @bash scripts/show_stats.sh
