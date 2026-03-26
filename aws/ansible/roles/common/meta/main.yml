@@ -1,0 +1,19 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: sdot
+  description: Common configuration for VoIP lab
+  company: VoIP Lab
+  license: MIT
+  min_ansible_version: 2.9
+  
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+  
+  galaxy_tags:
+    - voip
+    - common
+    - system

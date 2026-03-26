@@ -1,0 +1,22 @@
+---
+- name: Fix OpenSIPS 3.x syntax
+  hosts: aws-signaling
+  become: yes
+  tasks:
+    - name: Fix msg:len syntax in deployed config
+      replace:
+        path: /home/ubuntu/voiplab/opensips/opensips.cfg
+        regexp: 'if \(msg:len >= 2048\)'
+        replace: 'if ($ml >= 2048)'
+      
+    - name: Restart OpenSIPS container
+      community.docker.docker_container:
+        name: opensips
+        state: started
+        restart: yes
+      
+    - name: Wait for OpenSIPS to be ready
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: 5060
+        timeout: 30

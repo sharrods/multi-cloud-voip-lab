@@ -1,0 +1,66 @@
+---
+- name: Create OpenSIPS directory
+  file:
+    path: /home/{{ ansible_user }}/voiplab/opensips
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  tags: [opensips, install, directories]
+
+- name: Deploy OpenSIPS configuration
+  template:
+    src: opensips.cfg.j2
+    dest: /home/{{ ansible_user }}/voiplab/opensips/opensips.cfg
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: restart opensips
+  tags: [opensips, configure, config]
+
+- name: Deploy OpenSIPS container
+  docker_container:
+    name: opensips
+    image: "opensips/opensips:{{ opensips_version }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    volumes:
+      - /home/{{ ansible_user }}/voiplab/opensips/opensips.cfg:/etc/opensips/opensips.cfg:ro
+    log_driver: json-file
+    log_options:
+      max-size: "10m"
+      max-file: "3"
+  tags: [opensips, deploy, containers]
+
+- name: Wait for OpenSIPS to be ready
+  shell: docker exec opensips opensips-cli -x mi uptime
+  register: opensips_check
+  until: opensips_check.rc == 0
+  retries: 10
+  delay: 3
+  changed_when: false
+  failed_when: false
+
+- name: Verify OpenSIPS is responding
+  shell: docker exec opensips opensips-cli -x mi uptime
+  register: opensips_uptime
+  failed_when: opensips_uptime.rc != 0
+
+- name: Display OpenSIPS uptime
+  debug:
+    msg: "OpenSIPS is running: {{ opensips_uptime.stdout }}"
+
+- name: Verify OpenSIPS management interface
+  command: docker exec opensips opensips-cli -x mi uptime
+  register: opensips_uptime
+  changed_when: false
+  failed_when: false
+  tags: [opensips, deploy, verify]
+
+- name: Display OpenSIPS status
+  debug:
+    msg: |
+      OpenSIPS is listening on {{ private_ip }}:{{ opensips_listen_port }}
+      Management interface: {{ 'OK' if opensips_uptime.rc == 0 else 'Check logs' }}
+  tags: [opensips, deploy, verify]

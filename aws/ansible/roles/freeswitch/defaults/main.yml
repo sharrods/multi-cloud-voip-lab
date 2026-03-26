@@ -1,0 +1,4 @@
+---
+freeswitch_image: "safarov/freeswitch:latest"
+freeswitch_sip_port: 5080
+freeswitch_esl_port: 8021

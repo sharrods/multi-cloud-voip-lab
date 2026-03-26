@@ -1,0 +1,11 @@
+---
+# AWS-specific variables
+cloud: aws
+site_id: site3
+
+# Monitoring endpoints
+prometheus_endpoint: "34.172.210.177:9090"
+grafana_endpoint: "34.172.210.177:3000"
+
+# Network configuration
+vpn_network: "10.255.0.0/24"

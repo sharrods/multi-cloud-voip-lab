@@ -1,0 +1,287 @@
+# VoIP Lab Ansible Automation
+# ============================
+
+# Variables
+inventory := "inventory/hosts.yml"
+playbook := "playbooks/site.yml"
+ansible_opts := "-i " + inventory
+
+# Default recipe (shows help)
+default:
+    @just --list
+
+# Show detailed help
+help:
+    @echo "VoIP Lab Ansible Automation"
+    @echo "============================"
+    @echo ""
+    @echo "Infrastructure:"
+    @echo "  just check           - Test connectivity to all hosts"
+    @echo "  just install         - Install base system + Docker"
+    @echo "  just deploy          - Full deployment (all services)"
+    @echo ""
+    @echo "Selective Deployment:"
+    @echo "  just signaling       - Deploy signaling services only"
+    @echo "  just media           - Deploy media services only"
+    @echo "  just monitoring      - Deploy monitoring only"
+    @echo "  just opensips        - Deploy OpenSIPS only"
+    @echo "  just freeswitch      - Deploy FreeSWITCH only"
+    @echo "  just redis           - Deploy Redis only"
+    @echo ""
+    @echo "Management:"
+    @echo "  just verify          - Verify deployment status"
+    @echo "  just status          - Show service status"
+    @echo "  just logs SERVICE    - Show logs for service"
+    @echo "  just restart SERVICE - Restart a service"
+    @echo "  just clean           - Stop and remove all containers"
+    @echo ""
+    @echo "Testing:"
+    @echo "  just test-sip        - Test SIP connectivity"
+    @echo "  just test-metrics    - Test metrics exporters"
+    @echo "  just dry-run         - Show what would be deployed"
+    @echo ""
+    @echo "Info:"
+    @echo "  just list-tags       - List all available tags"
+    @echo "  just list-hosts      - List all inventory hosts"
+    @echo "  just info            - Show deployment info"
+
+# Test connectivity to all hosts
+check:
+    @echo "Testing connectivity to all AWS hosts..."
+    ansible {{ansible_opts}} aws -m ping
+
+# Gather facts from all hosts
+facts:
+    @echo "Gathering facts from AWS hosts..."
+    ansible {{ansible_opts}} aws -m setup
+
+# Install base system and Docker
+install:
+    @echo "Installing base system and Docker..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags "common,docker"
+
+# Full deployment
+deploy:
+    @echo "Deploying full VoIP stack..."
+    ansible-playbook {{ansible_opts}} {{playbook}}
+
+# Deploy signaling services
+signaling:
+    @echo "Deploying signaling services..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags signaling
+
+# Deploy media services
+media:
+    @echo "Deploying media services..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags media
+
+# Deploy monitoring only
+monitoring:
+    @echo "Deploying monitoring services..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags monitoring
+
+# Deploy OpenSIPS only
+opensips:
+    @echo "Deploying OpenSIPS..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags opensips
+
+# Deploy FreeSWITCH only
+freeswitch:
+    @echo "Deploying FreeSWITCH..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags freeswitch
+
+# Deploy RTPEngine only
+rtpengine:
+    @echo "Deploying RTPEngine..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags rtpengine
+
+# Deploy Redis only
+redis:
+    @echo "Deploying Redis..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags redis
+
+# Verify deployment
+verify:
+    @echo "Verifying deployment..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags verify
+
+# Show service status
+status:
+    @echo "=== AWS Signaling VM Status ==="
+    ansible {{ansible_opts}} signaling -b -m shell -a "docker ps --format 'table {{{{.Names}}}}\t{{{{.Status}}}}\t{{{{.Ports}}}}'"
+    @echo ""
+    @echo "=== AWS Media VM Status ==="
+    ansible {{ansible_opts}} media -b -m shell -a "docker ps --format 'table {{{{.Names}}}}\t{{{{.Status}}}}\t{{{{.Ports}}}}'"
+
+# Show logs for a specific service
+logs service:
+    @echo "Showing logs for {{service}}..."
+    ansible {{ansible_opts}} aws -b -m shell -a "docker logs {{service}} --tail 50"
+
+# Restart a specific service
+restart service:
+    @echo "Restarting {{service}}..."
+    ansible {{ansible_opts}} aws -b -m shell -a "docker restart {{service}}"
+
+# Stop all containers
+stop:
+    @echo "Stopping all containers..."
+    ansible {{ansible_opts}} aws -b -m shell -a "docker stop \$(docker ps -q)" || true
+
+# Clean up - remove all containers
+clean:
+    @echo "Removing all containers..."
+    ansible {{ansible_opts}} aws -b -m shell -a "docker stop \$(docker ps -aq) 2>/dev/null || true"
+    ansible {{ansible_opts}} aws -b -m shell -a "docker rm \$(docker ps -aq) 2>/dev/null || true"
+    @echo "Cleanup complete!"
+
+# Dry run - show what would be deployed
+dry-run:
+    @echo "Performing dry run..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --check --diff
+
+# List all available tags
+list-tags:
+    @echo "Available tags:"
+    ansible-playbook {{ansible_opts}} {{playbook}} --list-tags
+
+# List all inventory hosts
+list-hosts:
+    @echo "Inventory hosts:"
+    ansible-playbook {{ansible_opts}} {{playbook}} --list-hosts
+
+# Show deployment information
+info:
+    @echo "=== VoIP Lab Deployment Info ==="
+    @echo "Inventory: {{inventory}}"
+    @echo "Playbook:  {{playbook}}"
+    @echo ""
+    @echo "=== Hosts ==="
+    ansible-inventory {{ansible_opts}} --graph
+    @echo ""
+    @echo "=== Variables for aws-signaling ==="
+    ansible-inventory {{ansible_opts}} --host aws-signaling
+
+# Test SIP connectivity
+test-sip:
+    @echo "Testing SIP on signaling VM..."
+    ansible {{ansible_opts}} signaling -m shell -a "echo -e 'OPTIONS sip:test@\$(hostname -I | awk '{print \$1}') SIP/2.0\r\n\r\n' | nc -u -w 2 localhost 5060"
+
+# Test metrics exporters
+test-metrics:
+    @echo "Testing Node Exporter on signaling VM..."
+    ansible {{ansible_opts}} signaling -m uri -a "url=http://127.0.0.1:9100/metrics status_code=200"
+    @echo ""
+    @echo "Testing Node Exporter on media VM..."
+    ansible {{ansible_opts}} media -m uri -a "url=http://127.0.0.1:9100/metrics status_code=200"
+
+# Deploy to specific host
+deploy-host host:
+    @echo "Deploying to {{host}}..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --limit {{host}}
+
+# Run specific tag
+run-tag tag:
+    @echo "Running tag: {{tag}}..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --tags {{tag}}
+
+# Skip specific tag
+skip-tag tag:
+    @echo "Skipping tag: {{tag}}..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --skip-tags {{tag}}
+
+# Update all packages on hosts
+update:
+    @echo "Updating all packages..."
+    ansible {{ansible_opts}} aws -b -m apt -a "upgrade=dist update_cache=yes"
+
+# Reboot all hosts
+reboot:
+    @echo "Rebooting all AWS hosts..."
+    ansible {{ansible_opts}} aws -b -m reboot
+
+# Show disk usage
+disk-usage:
+    @echo "=== Disk Usage ==="
+    ansible {{ansible_opts}} aws -m shell -a "df -h /"
+
+# Show memory usage
+memory-usage:
+    @echo "=== Memory Usage ==="
+    ansible {{ansible_opts}} aws -m shell -a "free -h"
+
+# Show Docker stats
+docker-stats:
+    @echo "=== Docker Stats - Signaling VM ==="
+    ansible {{ansible_opts}} signaling -b -m shell -a "docker stats --no-stream"
+    @echo ""
+    @echo "=== Docker Stats - Media VM ==="
+    ansible {{ansible_opts}} media -b -m shell -a "docker stats --no-stream"
+
+# Backup configurations
+backup:
+    @echo "Backing up configurations..."
+    @mkdir -p backups/$(date +%Y%m%d)
+    ansible {{ansible_opts}} aws -b -m fetch -a "src=/home/ubuntu/voiplab dest=backups/$(date +%Y%m%d) flat=no"
+    @echo "Backup saved to backups/$(date +%Y%m%d)"
+
+# Show running processes
+processes:
+    @echo "=== Running Processes ==="
+    ansible {{ansible_opts}} aws -m shell -a "ps aux | head -20"
+
+# Network diagnostics
+netstat:
+    @echo "=== Network Connections ==="
+    ansible {{ansible_opts}} aws -b -m shell -a "netstat -tupln | grep -E '(5060|6379|9100|9121|10000:20000)'"
+
+# Quick deployment (skip verification)
+quick-deploy:
+    @echo "Quick deployment (skipping verification)..."
+    ansible-playbook {{ansible_opts}} {{playbook}} --skip-tags verify
+
+# Development mode (verbose output)
+dev-deploy:
+    @echo "Development deployment with verbose output..."
+    ansible-playbook {{ansible_opts}} {{playbook}} -vv
+
+# Production deployment (with checks)
+prod-deploy:
+    @echo "Production deployment with all checks..."
+    @just check
+    @just dry-run
+    @echo "Press Enter to continue with deployment..."
+    @read
+    @just deploy
+    @just verify
+
+# Show Ansible version
+version:
+    @echo "=== Tool Versions ==="
+    @echo "Just:    $(just --version)"
+    @echo "Ansible: $(ansible --version | head -1)"
+    @echo "Python:  $(python3 --version)"
+
+# Interactive deployment menu
+interactive:
+    #!/usr/bin/env bash
+    echo "=== VoIP Lab Interactive Deployment ==="
+    echo "1) Full deployment"
+    echo "2) Signaling only"
+    echo "3) Media only"
+    echo "4) Monitoring only"
+    echo "5) Verify deployment"
+    echo "6) Clean up"
+    echo "7) Exit"
+    echo ""
+    read -p "Select option: " choice
+    case $choice in
+        1) just deploy ;;
+        2) just signaling ;;
+        3) just media ;;
+        4) just monitoring ;;
+        5) just verify ;;
+        6) just clean ;;
+        7) exit 0 ;;
+        *) echo "Invalid option" ;;
+    esac

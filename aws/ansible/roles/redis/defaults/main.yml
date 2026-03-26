@@ -1,0 +1,5 @@
+---
+redis_version: "7-alpine"
+redis_password: "VoipLab2026"
+redis_maxmemory: "50mb"
+redis_maxmemory_policy: "allkeys-lru"

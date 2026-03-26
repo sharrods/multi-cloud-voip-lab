@@ -1,0 +1,42 @@
+---
+- name: Create FreeSWITCH directory
+  file:
+    path: /home/{{ ansible_user }}/voiplab/freeswitch
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  tags: [freeswitch, install, directories]
+
+- name: Deploy FreeSWITCH container
+  docker_container:
+    name: freeswitch
+    image: "{{ freeswitch_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    privileged: yes
+    log_driver: json-file
+    log_options:
+      max-size: "10m"
+      max-file: "3"
+  tags: [freeswitch, deploy, containers]
+
+- name: Wait for FreeSWITCH to start
+  pause:
+    seconds: 10
+  tags: [freeswitch, deploy]
+
+- name: Check FreeSWITCH container status
+  shell: docker ps -f name=freeswitch --format '{%raw%}{{.Status}}{%endraw%}'
+  register: freeswitch_status
+  changed_when: false
+  tags: [freeswitch, deploy, verify]
+
+- name: Display FreeSWITCH status
+  debug:
+    msg: |
+      FreeSWITCH container: {{ freeswitch_status.stdout }}
+      SIP port: {{ private_ip }}:{{ freeswitch_sip_port }}
+      ESL port: {{ freeswitch_esl_port }}
+  tags: [freeswitch, deploy, verify]

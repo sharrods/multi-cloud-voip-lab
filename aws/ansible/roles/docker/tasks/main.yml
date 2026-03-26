@@ -1,0 +1,16 @@
+---
+- name: Check if Docker is already installed
+  command: docker --version
+  register: docker_check
+  failed_when: false
+  changed_when: false
+  tags: [docker, check, validate]
+
+- name: Docker installation tasks
+  include_tasks: install.yml
+  when: docker_check.rc != 0
+  tags: [docker, install]
+
+- name: Docker configuration tasks
+  include_tasks: configure.yml
+  tags: [docker, configure]

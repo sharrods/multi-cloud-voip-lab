@@ -1,0 +1,3 @@
+---
+rtpengine_image: "drachtio/rtpengine:latest"
+rtpengine_control_port: 22222

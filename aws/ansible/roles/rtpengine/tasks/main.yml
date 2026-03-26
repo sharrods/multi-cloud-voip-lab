@@ -1,0 +1,43 @@
+---
+- name: Create RTPEngine directory
+  file:
+    path: /home/{{ ansible_user }}/voiplab/rtpengine
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  tags: [rtpengine, install, directories]
+
+- name: Deploy RTPEngine container
+  docker_container:
+    name: rtpengine
+    image: "{{ rtpengine_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    privileged: yes
+    command: "rtpengine --interface={{ private_ip }} --foreground"
+    log_driver: json-file
+    log_options:
+      max-size: "10m"
+      max-file: "3"
+  tags: [rtpengine, deploy, containers]
+
+- name: Wait for RTPEngine to start
+  pause:
+    seconds: 5
+  tags: [rtpengine, deploy]
+
+- name: Check RTPEngine container status
+  shell: docker ps -f name=rtpengine --format '{%raw%}{{.Status}}{%endraw%}'
+  register: rtpengine_status
+  changed_when: false
+  tags: [rtpengine, deploy, verify]
+
+- name: Display RTPEngine status
+  debug:
+    msg: |
+      RTPEngine container: {{ rtpengine_status.stdout }}
+      Interface: {{ private_ip }}
+      Control port: {{ rtpengine_control_port }}
+  tags: [rtpengine, deploy, verify]

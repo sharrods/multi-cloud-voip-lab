@@ -1,0 +1,94 @@
+# OpenSIPS {{ opensips_version }} Configuration
+# Host: {{ inventory_hostname }}
+# Generated: {{ ansible_date_time.iso8601 }}
+
+####### Global Parameters #########
+
+# Enhanced logging for debugging
+log_level = 4
+log_stderror = yes
+log_facility = LOG_LOCAL0
+
+# Network - Listen on private IP
+auto_aliases = no
+socket = udp:{{ private_ip }}:{{ opensips_listen_port }}
+
+# Modules path
+mpath = "/usr/lib/x86_64-linux-gnu/opensips/modules/"
+
+####### Modules Section ########
+
+loadmodule "signaling.so"
+loadmodule "sl.so"
+loadmodule "tm.so"
+loadmodule "proto_udp.so"
+loadmodule "rr.so"
+loadmodule "maxfwd.so"
+loadmodule "textops.so"
+loadmodule "sipmsgops.so"
+loadmodule "mi_fifo.so"
+
+####### Module Parameters ########
+
+modparam("mi_fifo", "fifo_name", "/tmp/opensips_fifo")
+
+####### Routing Logic ########
+
+route {
+    xlog("L_INFO", "===== Received $rm from $si:$sp =====\n");
+    xlog("L_INFO", "Request-URI: $ru | From: $fu | To: $tu\n");
+    
+    # Drop retransmissions
+    if (!is_method("ACK")) {
+        if (t_check_trans()) {
+            xlog("L_INFO", "Retransmission detected\n");
+            exit;
+        }
+        t_check_trans();
+    }
+    
+    # Max forwards check
+    if (!mf_process_maxfwd_header(10)) {
+        xlog("L_WARN", "Too many hops from $si\n");
+        sl_send_reply(483, "Too Many Hops");
+        exit;
+    }
+
+    # Message size check
+    if ($ml >= 2048) {
+        xlog("L_WARN", "Message too large: $(ml) bytes\n");
+        sl_send_reply(513, "Message Too Big");
+        exit;
+    }
+
+    # Handle REGISTER
+    if (is_method("REGISTER")) {
+        xlog("L_INFO", "Processing REGISTER from $fu\n");
+        sl_send_reply(200, "OK - AWS Registered");
+        exit;
+    }
+
+    # Handle OPTIONS
+    if (is_method("OPTIONS")) {
+        xlog("L_INFO", "Processing OPTIONS from $si\n");
+        sl_send_reply(200, "OK - AWS Ready");
+        exit;
+    }
+
+    # Record route for other requests
+    if (!is_method("REGISTER|OPTIONS|ACK|CANCEL")) {
+        record_route();
+    }
+
+    # Default: forward or reject
+    xlog("L_INFO", "Request $rm - forwarding or rejecting\n");
+    sl_send_reply(404, "Not Found");
+}
+
+onreply_route[DEFAULT] {
+    xlog("L_INFO", "Received reply $rs from $si\n");
+}
+
+failure_route[DEFAULT] {
+    xlog("L_WARN", "Call failed from $si\n");
+}

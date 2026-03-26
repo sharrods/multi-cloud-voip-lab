@@ -1,0 +1,20 @@
+---
+# Global variables for all hosts
+project_name: voip-lab
+environment: production
+deployment_date: "{{ ansible_date_time.iso8601 }}"
+
+# Docker configuration
+docker_version: "latest"
+docker_compose_version: "2.24.0"
+
+# Common packages
+common_packages:
+  - curl
+  - wget
+  - net-tools
+  - tcpdump
+  - vim
+  - htop
+  - iotop
+  - git

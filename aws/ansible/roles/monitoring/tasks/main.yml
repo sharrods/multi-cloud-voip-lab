@@ -1,0 +1,47 @@
+---
+- name: Deploy Node Exporter
+  docker_container:
+    name: node-exporter
+    image: prom/node-exporter:latest
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    privileged: yes
+    volumes:
+      - /:/host:ro
+    command: --path.rootfs=/host
+    log_driver: json-file
+    log_options:
+      max-size: "10m"
+      max-file: "3"
+  tags: [monitoring, exporters, node-exporter, deploy]
+
+- name: Deploy Redis Exporter
+  docker_container:
+    name: redis-exporter
+    image: oliver006/redis_exporter:latest
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    env:
+      REDIS_ADDR: "redis://127.0.0.1:6379"
+      REDIS_PASSWORD: "{{ redis_password }}"
+    log_driver: json-file
+    log_options:
+      max-size: "10m"
+      max-file: "3"
+  when: "'redis_exporter' in services"
+  tags: [monitoring, exporters, redis-exporter, deploy]
+
+- name: Wait for Node Exporter
+  wait_for:
+    port: 9100
+    delay: 3
+    timeout: 30
+  tags: [monitoring, exporters, verify]
+
+- name: Verify Node Exporter metrics
+  uri:
+    url: "http://127.0.0.1:9100/metrics"
+    status_code: 200
+  tags: [monitoring, exporters, verify]

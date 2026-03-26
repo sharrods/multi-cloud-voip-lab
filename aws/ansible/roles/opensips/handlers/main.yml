@@ -1,0 +1,6 @@
+---
+- name: restart opensips
+  docker_container:
+    name: opensips
+    state: started
+    restart: yes

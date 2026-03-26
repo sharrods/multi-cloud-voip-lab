@@ -1,0 +1,9 @@
+---
+# Default variables for common role
+common_packages:
+  - curl
+  - wget
+  - net-tools
+  - tcpdump
+  - vim
+  - htop

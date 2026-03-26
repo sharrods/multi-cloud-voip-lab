@@ -1,0 +1,5 @@
+---
+opensips_version: "3.4"
+opensips_listen_ip: "{{ private_ip }}"
+opensips_listen_port: 5060
+opensips_max_hops: 10

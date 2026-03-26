@@ -1,0 +1,59 @@
+---
+- name: Deploy VoIP Infrastructure on AWS
+  hosts: aws
+  become: yes
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: Display deployment information
+      debug:
+        msg: |
+          Deploying to: {{ inventory_hostname }}
+          Cloud: {{ cloud_provider }}
+          Role: {{ server_role }}
+          Private IP: {{ private_ip }}
+      tags: [always]
+  
+  roles:
+    - role: common
+      tags: [common, base]
+      
+    - role: docker
+      tags: [docker, infrastructure]
+  
+  post_tasks:
+    - name: Deployment summary
+      debug:
+        msg: "Base infrastructure deployed on {{ inventory_hostname }}"
+      tags: [always]
+
+- name: Deploy Signaling Services
+  hosts: signaling
+  become: yes
+  
+  roles:
+    - role: redis
+      tags: [redis, database, signaling]
+      
+    - role: opensips
+      tags: [opensips, sip, signaling]
+      
+    - role: monitoring
+      tags: [monitoring, exporters, signaling]
+
+- name: Deploy Media Services
+  hosts: media
+  become: yes
+  
+  roles:
+    - role: redis
+      tags: [redis, database, media]
+      
+    - role: rtpengine
+      tags: [rtpengine, rtp, media]
+      
+    - role: freeswitch
+      tags: [freeswitch, media]
+      
+    - role: monitoring
+      tags: [monitoring, exporters, media]
