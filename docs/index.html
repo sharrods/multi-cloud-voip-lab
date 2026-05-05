@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Cloud VoIP Lab — Architecture</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #060a0f;
+  --surface: #0d1117;
+  --border: rgba(255,255,255,0.07);
+  --accent: #00e5ff;
+  --accent2: #ff6b2b;
+  --text: #e6edf3;
+  --muted: #7d8590;
+
+  --gcp: #4285f4;
+  --gcp-dim: rgba(66,133,244,0.12);
+  --gcp-border: rgba(66,133,244,0.35);
+
+  --aws: #ff9900;
+  --aws-dim: rgba(255,153,0,0.12);
+  --aws-border: rgba(255,153,0,0.35);
+
+  --oracle: #f80000;
+  --oracle-dim: rgba(248,0,0,0.1);
+  --oracle-border: rgba(248,0,0,0.3);
+
+  --azure: #0089d6;
+  --azure-dim: rgba(0,137,214,0.1);
+  --azure-border: rgba(0,137,214,0.3);
+
+  --twilio: #f22f46;
+  --twilio-dim: rgba(242,47,70,0.1);
+  --twilio-border: rgba(242,47,70,0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* HEADER */
+.header {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 48px 24px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.1em;
+  margin-bottom: 20px;
+  transition: color 0.2s;
+}
+.back-link:hover { color: var(--accent); }
+
+.header-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--accent);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.header h1 {
+  font-size: clamp(1.6rem, 4vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+}
+
+.header h1 span {
+  background: linear-gradient(135deg, var(--accent), #60efff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* MAIN LAYOUT */
+.diagram-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+/* SECTION LABELS */
+.section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* ── INGRESS ROW ── */
+.ingress-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ingress-node {
+  background: var(--twilio-dim);
+  border: 1px solid var(--twilio-border);
+  border-radius: 12px;
+  padding: 16px 28px;
+  text-align: center;
+  min-width: 200px;
+}
+
+.ingress-node .node-icon { font-size: 1.4rem; margin-bottom: 6px; }
+.ingress-node .node-title { font-size: 0.85rem; font-weight: 700; color: var(--twilio); }
+.ingress-node .node-sub { font-size: 0.65rem; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 3px; }
+
+.srv-badge {
+  background: rgba(0,229,255,0.08);
+  border: 1px dashed rgba(0,229,255,0.3);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--accent);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ── ARROW ── */
+.arrow-down {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  margin: 4px 0;
+}
+
+.arrow-line {
+  width: 2px;
+  height: 28px;
+  background: linear-gradient(to bottom, var(--accent), rgba(0,229,255,0.3));
+}
+
+.arrow-head {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid rgba(0,229,255,0.6);
+}
+
+.arrow-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+/* ── ORACLE ROW ── */
+.oracle-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.oracle-node {
+  background: var(--oracle-dim);
+  border: 2px solid var(--oracle-border);
+  border-radius: 16px;
+  padding: 20px 32px;
+  min-width: 340px;
+  max-width: 500px;
+  width: 100%;
+  position: relative;
+}
+
+.cloud-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.cloud-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cloud-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cloud-title {
+  font-size: 1rem;
+  font-weight: 700;
+  flex: 1;
+}
+
+.deploy-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  padding: 3px 8px;
+  border-radius: 100px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.deploy-baremetal { background: rgba(248,0,0,0.15); color: #f80000; border: 1px solid rgba(248,0,0,0.3); }
+.deploy-compose { background: rgba(66,133,244,0.15); color: #4285f4; border: 1px solid rgba(66,133,244,0.3); }
+.deploy-terraform { background: rgba(123,66,188,0.15); color: #9b59b6; border: 1px solid rgba(123,66,188,0.3); }
+.deploy-tools { background: rgba(0,137,214,0.15); color: #0089d6; border: 1px solid rgba(0,137,214,0.3); }
+
+.vm-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.vm-box {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.vm-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.08em;
+}
+
+.vm-services {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.svc-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.svc-opensips { background: rgba(0,229,255,0.1); color: var(--accent); border-color: rgba(0,229,255,0.2); }
+.svc-freeswitch { background: rgba(0,200,100,0.1); color: #00c864; border-color: rgba(0,200,100,0.2); }
+.svc-rtpengine { background: rgba(255,107,43,0.1); color: var(--accent2); border-color: rgba(255,107,43,0.2); }
+.svc-prometheus { background: rgba(230,82,44,0.1); color: #e6522c; border-color: rgba(230,82,44,0.2); }
+.svc-grafana { background: rgba(244,104,0,0.1); color: #f46800; border-color: rgba(244,104,0,0.2); }
+.svc-redis { background: rgba(255,65,54,0.1); color: #ff4136; border-color: rgba(255,65,54,0.2); }
+.svc-alertmgr { background: rgba(255,193,7,0.1); color: #ffc107; border-color: rgba(255,193,7,0.2); }
+
+.challenge-box {
+  background: rgba(255,107,43,0.05);
+  border: 1px solid rgba(255,107,43,0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.challenge-box strong {
+  color: var(--accent2);
+  font-size: 0.65rem;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* ── SPLIT ARROW ── */
+.split-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0;
+  margin: 4px 0;
+  position: relative;
+}
+
+.split-container {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.split-label-center {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--bg);
+  padding: 0 8px;
+  z-index: 2;
+}
+
+.split-svg {
+  width: 100%;
+  height: 60px;
+}
+
+/* ── DC ROW ── */
+.dc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 900px;
+  margin: 0 auto 8px;
+}
+
+.dc-node {
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+}
+
+.dc-node.gcp {
+  background: var(--gcp-dim);
+  border: 2px solid var(--gcp-border);
+}
+
+.dc-node.aws {
+  background: var(--aws-dim);
+  border: 2px solid var(--aws-border);
+}
+
+.future-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: #326ce5;
+  background: rgba(50,108,229,0.1);
+  border: 1px solid rgba(50,108,229,0.25);
+  border-radius: 100px;
+  padding: 2px 8px;
+  margin-top: 8px;
+}
+
+/* ── MONITORING LAYER ── */
+.monitoring-arrow {
+  max-width: 900px;
+  margin: 16px auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.monitoring-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(230,82,44,0.4), transparent);
+}
+
+.monitoring-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: #e6522c;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── AZURE ROW ── */
+.azure-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.azure-node {
+  background: var(--azure-dim);
+  border: 1px dashed var(--azure-border);
+  border-radius: 16px;
+  padding: 20px 32px;
+  max-width: 700px;
+  width: 100%;
+}
+
+/* ── FAILOVER SECTION ── */
+.failover-section {
+  max-width: 900px;
+  margin: 40px auto 0;
+  background: rgba(0,229,255,0.02);
+  border: 1px solid rgba(0,229,255,0.1);
+  border-radius: 16px;
+  padding: 28px;
+}
+
+.failover-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.failover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.failover-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.failover-scenario {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--accent2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.failover-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ── MONITORING TARGETS ── */
+.targets-section {
+  max-width: 900px;
+  margin: 24px auto 0;
+  background: rgba(230,82,44,0.03);
+  border: 1px solid rgba(230,82,44,0.12);
+  border-radius: 16px;
+  padding: 28px;
+}
+
+.targets-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.targets-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: #e6522c;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.targets-count {
+  font-family: 'Space Mono', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #e6522c;
+  line-height: 1;
+}
+
+.targets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.target-item {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.target-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.target-dot.up { background: #00c864; box-shadow: 0 0 4px #00c864; }
+.target-dot.mixed { background: #ffc107; }
+
+.alert-channels {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.alert-chip {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: rgba(255,255,255,0.03);
+}
+
+/* FOOTER */
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 32px 24px;
+  border-top: 1px solid var(--border);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 60px;
+}
+
+footer a { color: var(--accent); text-decoration: none; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fadeUp 0.5s ease forwards; opacity: 0; }
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+
+@media (max-width: 640px) {
+  .dc-row { grid-template-columns: 1fr; }
+  .oracle-node { min-width: unset; }
+  .vm-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<header class="header fade-up">
+  <a href="https://github.com/sharrods/multi-cloud-voip-lab" class="back-link">
+    ← github.com/sharrods/multi-cloud-voip-lab
+  </a>
+  <div class="header-tag">// system architecture</div>
+  <h1>Multi-Cloud <span>VoIP Lab</span></h1>
+  <p>Production-grade carrier VoIP infrastructure spanning 4 cloud providers. Every cloud deployed differently — because real infrastructure never comes from the same playbook.</p>
+</header>
+
+<div class="diagram-container">
+
+  <!-- INGRESS -->
+  <div class="section-label fade-up delay-1">// ingress — public internet</div>
+  <div class="ingress-row fade-up delay-1">
+    <div class="ingress-node">
+      <div class="node-icon">📞</div>
+      <div class="node-title">Twilio / Carriers</div>
+      <div class="node-sub">PSTN · SIP Trunking · Inbound DID</div>
+    </div>
+    <div class="srv-badge">
+      SRV Records<br>
+      <span style="color:var(--text);font-size:0.7rem;">Carrier-level DNS failover</span><br>
+      <span style="font-size:0.6rem;">_sip._udp → Oracle → GCP / AWS</span>
+    </div>
+  </div>
+
+  <!-- ARROW DOWN -->
+  <div style="display:flex;flex-direction:column;align-items:center;margin:4px 0;">
+    <div class="arrow-line"></div>
+    <div class="arrow-head"></div>
+    <div class="arrow-label">SIP UDP/TCP · Port 5060</div>
+  </div>
+
+  <!-- ORACLE -->
+  <div class="section-label" style="margin-top:12px;">// primary entry point — load balancer</div>
+  <div class="oracle-row fade-up delay-2">
+    <div class="oracle-node">
+      <div class="cloud-header">
+        <div class="cloud-dot" style="background:var(--oracle);box-shadow:0 0 8px var(--oracle);"></div>
+        <div>
+          <div class="cloud-label">Oracle Cloud · us-ashburn · Site 1</div>
+          <div class="cloud-title" style="color:var(--oracle);">Oracle Cloud — Load Balancer</div>
+        </div>
+        <span class="deploy-badge deploy-baremetal">🐳 Docker (Manual)</span>
+      </div>
+      <div class="vm-row">
+        <div class="vm-box">
+          <div class="vm-name">oracle-vm1 · Signaling</div>
+          <div class="vm-services">
+            <span class="svc-tag svc-opensips">OpenSIPS</span>
+            <span class="svc-tag svc-redis">Redis</span>
+          </div>
+        </div>
+        <div class="vm-box">
+          <div class="vm-name">oracle-vm2 · Media</div>
+          <div class="vm-services">
+            <span class="svc-tag svc-freeswitch">FreeSWITCH</span>
+            <span class="svc-tag svc-rtpengine">RTPEngine</span>
+            <span class="svc-tag svc-redis">Redis</span>
+          </div>
+        </div>
+      </div>
+      <div class="challenge-box">
+        <strong>⚡ Real World Challenge</strong>
+        1GB RAM VMs crash under load — Docker runs but no Compose, every container managed manually. Hardest deployment in the lab to keep stable. I rebuild it, learn it deeper, and keep going. Real ops never stops.
+      </div>
+    </div>
+  </div>
+
+  <!-- SPLIT ARROWS 50/50 -->
+  <div style="display:flex;justify-content:center;margin:8px 0;">
+    <div class="split-container">
+      <div class="split-label-center">50 / 50 Active Load Split · Mutual Failover → 100%</div>
+      <svg class="split-svg" viewBox="0 0 600 60" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,229,255,0.6)"/>
+          </marker>
+        </defs>
+        <!-- left line to GCP -->
+        <line x1="300" y1="10" x2="120" y2="50" stroke="rgba(0,229,255,0.4)" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- right line to AWS -->
+        <line x1="300" y1="10" x2="480" y2="50" stroke="rgba(0,229,255,0.4)" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- vertical stub -->
+        <line x1="300" y1="0" x2="300" y2="10" stroke="rgba(0,229,255,0.5)" stroke-width="1.5"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- DC ROW: GCP + AWS -->
+  <div class="dc-row fade-up delay-3">
+
+    <!-- GCP -->
+    <div class="dc-node gcp">
+      <div class="cloud-header">
+        <div class="cloud-dot" style="background:var(--gcp);box-shadow:0 0 8px var(--gcp);"></div>
+        <div>
+          <div class="cloud-label">GCP · us-central1 · Site 2</div>
+          <div class="cloud-title" style="color:var(--gcp);">Google Cloud Platform</div>
+        </div>
+        <span class="deploy-badge deploy-compose">🐳 Docker Compose</span>
+      </div>
+      <div class="vm-box" style="margin-bottom:10px;">
+        <div class="vm-name">gcp-voip · All-in-One · 13 Services</div>
+        <div class="vm-services" style="flex-wrap:wrap;gap:4px;margin-top:6px;">
+          <span class="svc-tag svc-opensips">OpenSIPS</span>
+          <span class="svc-tag svc-freeswitch">FreeSWITCH</span>
+          <span class="svc-tag svc-rtpengine">RTPEngine</span>
+          <span class="svc-tag svc-redis">Redis</span>
+          <span class="svc-tag svc-prometheus">Prometheus</span>
+          <span class="svc-tag svc-grafana">Grafana</span>
+          <span class="svc-tag svc-alertmgr">Alertmanager</span>
+          <span class="svc-tag" style="background:rgba(0,229,255,0.08);color:var(--accent);border-color:rgba(0,229,255,0.2);">SBC Dashboard</span>
+        </div>
+      </div>
+      <div style="background:rgba(66,133,244,0.07);border:1px solid rgba(66,133,244,0.15);border-radius:8px;padding:8px 12px;font-size:0.7rem;color:var(--muted);margin-bottom:8px;">
+        <span style="color:var(--gcp);font-family:'DM Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:3px;">📊 Monitoring Hub</span>
+        Centralized Prometheus scrapes all 17 targets across all clouds. Grafana dashboards for every service. Alerts route to Slack, Gmail, and ntfy.
+      </div>
+      <div class="challenge-box">
+        <strong>⚡ Real World Challenge</strong>
+        Free tier killed the server mid-deployment → containers died → lost visibility across ALL clouds → alerts went silent. Restarted, discovered IP changed → had to re-add ACL rules in Azure + security groups in AWS. Every scraper was broken. Fixed it all manually. Now I pay for GCP.
+      </div>
+    </div>
+
+    <!-- AWS -->
+    <div class="dc-node aws">
+      <div class="cloud-header">
+        <div class="cloud-dot" style="background:var(--aws);box-shadow:0 0 8px var(--aws);"></div>
+        <div>
+          <div class="cloud-label">AWS · us-east-1 · Site 3</div>
+          <div class="cloud-title" style="color:var(--aws);">Amazon Web Services</div>
+        </div>
+        <span class="deploy-badge deploy-terraform">🔷 Terraform + Ansible</span>
+      </div>
+      <div class="vm-row">
+        <div class="vm-box">
+          <div class="vm-name">aws-signaling</div>
+          <div class="vm-services">
+            <span class="svc-tag svc-opensips">OpenSIPS</span>
+            <span class="svc-tag svc-redis">Redis</span>
+          </div>
+        </div>
+        <div class="vm-box">
+          <div class="vm-name">aws-media</div>
+          <div class="vm-services">
+            <span class="svc-tag svc-freeswitch">FreeSWITCH</span>
+            <span class="svc-tag svc-rtpengine">RTPEngine</span>
+            <span class="svc-tag svc-redis">Redis</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:rgba(255,153,0,0.07);border:1px solid rgba(255,153,0,0.15);border-radius:8px;padding:8px 12px;font-size:0.7rem;color:var(--muted);margin:10px 0 8px;">
+        <span style="color:var(--aws);font-family:'DM Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:3px;">🏗 Cleanest Build</span>
+        Terraform provisions infrastructure. Ansible configures services. Most reproducible, most stable — easiest to rebuild from scratch.
+      </div>
+      <div class="challenge-box">
+        <strong>⚡ Ongoing</strong>
+        Refining deployment best practices. Most stable DC — handles load consistently. Best candidate for Kubernetes migration.
+      </div>
+      <div class="future-badge">
+        ⎈ Kubernetes Migration — Planned
+      </div>
+    </div>
+  </div>
+
+  <!-- MONITORING SCRAPE INDICATOR -->
+  <div class="monitoring-arrow" style="max-width:900px;margin:16px auto 8px;">
+    <div class="monitoring-line"></div>
+    <div class="monitoring-label">◀ Prometheus scrapes all clouds (17 targets) → GCP ▶</div>
+    <div class="monitoring-line"></div>
+  </div>
+
+  <!-- AZURE -->
+  <div class="section-label" style="margin-top:20px;">// control plane — zero call traffic</div>
+  <div class="azure-row fade-up">
+    <div class="azure-node">
+      <div class="cloud-header">
+        <div class="cloud-dot" style="background:var(--azure);box-shadow:0 0 8px var(--azure);"></div>
+        <div>
+          <div class="cloud-label">Microsoft Azure · Bastion Host</div>
+          <div class="cloud-title" style="color:var(--azure);">Azure — Operations & Control Plane</div>
+        </div>
+        <span class="deploy-badge deploy-tools">🔧 Tool Server</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+        <div class="vm-box">
+          <div class="vm-name">SSH Bastion · ProxyJump</div>
+          <div class="vm-services"><span class="svc-tag">All Cloud Access</span></div>
+        </div>
+        <div class="vm-box">
+          <div class="vm-name">SIP Debug Stack</div>
+          <div class="vm-services">
+            <span class="svc-tag">sngrep</span>
+            <span class="svc-tag">SIPp</span>
+            <span class="svc-tag">Custom Tools</span>
+          </div>
+        </div>
+        <div class="vm-box">
+          <div class="vm-name">Load Testing</div>
+          <div class="vm-services">
+            <span class="svc-tag">SIPP Regression</span>
+            <span class="svc-tag">Justfile</span>
+          </div>
+        </div>
+        <div class="vm-box">
+          <div class="vm-name">Automation</div>
+          <div class="vm-services">
+            <span class="svc-tag">Ansible</span>
+            <span class="svc-tag">Terraform</span>
+            <span class="svc-tag">Justfile</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:10px;font-style:italic;border-top:1px solid var(--border);padding-top:8px;">
+        No voice stack. No call traffic. Pure operations — the place where every fix, every debug session, and every deployment starts.
+      </div>
+    </div>
+  </div>
+
+  <!-- FAILOVER SCENARIOS -->
+  <div class="failover-section fade-up">
+    <div class="failover-title">// failover scenarios</div>
+    <div class="failover-grid">
+      <div class="failover-card">
+        <div class="failover-scenario">🔴 Oracle Down</div>
+        <div class="failover-desc">SRV records at carrier level point directly to GCP and AWS OpenSIPS. Calls bypass Oracle entirely — carriers resolve to whichever DC responds first. Zero manual intervention.</div>
+      </div>
+      <div class="failover-card">
+        <div class="failover-scenario">🟡 GCP or AWS Single Failure</div>
+        <div class="failover-desc">Oracle detects the failed node and stops routing to it. Surviving DC absorbs 100% of traffic automatically. Load shifts without dropping active calls where possible.</div>
+      </div>
+      <div class="failover-card">
+        <div class="failover-scenario">⚫ Both GCP + AWS Down</div>
+        <div class="failover-desc">Oracle plays emergency announcement — callers hear a service degradation message. No silent failures. Alertmanager fires to Slack, Gmail, and ntfy simultaneously.</div>
+      </div>
+      <div class="failover-card">
+        <div class="failover-scenario">🔵 IP Change Event</div>
+        <div class="failover-desc">Learned the hard way — GCP free tier restart changed the IP. Required re-adding ACL rules in Azure, security groups in AWS, and Prometheus scrape targets. Now documented as a runbook.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MONITORING TARGETS -->
+  <div class="targets-section fade-up">
+    <div class="targets-header">
+      <div class="targets-count">17</div>
+      <div>
+        <div class="targets-title">// prometheus monitoring targets</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:3px;">All scraped centrally from GCP · Refresh: 1m</div>
+      </div>
+    </div>
+    <div class="targets-grid">
+      <div class="target-item"><div class="target-dot up"></div>gcp-node-exporter</div>
+      <div class="target-item"><div class="target-dot up"></div>gcp-opensips-exporter</div>
+      <div class="target-item"><div class="target-dot up"></div>gcp-freeswitch-exporter</div>
+      <div class="target-item"><div class="target-dot up"></div>gcp-rtpengine-exporter</div>
+      <div class="target-item"><div class="target-dot up"></div>gcp-redis-exporter</div>
+      <div class="target-item"><div class="target-dot up"></div>gcp-prometheus</div>
+      <div class="target-item"><div class="target-dot up"></div>oracle-vm1-node</div>
+      <div class="target-item"><div class="target-dot up"></div>oracle-vm1-opensips</div>
+      <div class="target-item"><div class="target-dot up"></div>oracle-vm1-redis</div>
+      <div class="target-item"><div class="target-dot up"></div>oracle-vm2-node</div>
+      <div class="target-item"><div class="target-dot up"></div>oracle-vm2-rtpengine</div>
+      <div class="target-item"><div class="target-dot up"></div>oracle-vm2-freeswitch</div>
+      <div class="target-item"><div class="target-dot up"></div>oracle-vm2-redis</div>
+      <div class="target-item"><div class="target-dot mixed"></div>aws-signaling-node</div>
+      <div class="target-item"><div class="target-dot up"></div>aws-signaling-opensips</div>
+      <div class="target-item"><div class="target-dot up"></div>aws-signaling-redis</div>
+      <div class="target-item"><div class="target-dot mixed"></div>aws-media-node</div>
+      <div class="target-item"><div class="target-dot up"></div>aws-media-freeswitch</div>
+      <div class="target-item"><div class="target-dot up"></div>aws-media-rtpengine</div>
+      <div class="target-item"><div class="target-dot up"></div>aws-media-redis</div>
+    </div>
+    <div style="margin-top:12px;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">Alert Channels</div>
+    <div class="alert-channels">
+      <div class="alert-chip">💬 Slack</div>
+      <div class="alert-chip">📧 Gmail</div>
+      <div class="alert-chip">📱 ntfy (T-Mobile fallback)</div>
+      <div class="alert-chip">🔔 Alertmanager</div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>
+    <strong>Sharrod Skinner</strong> ·
+    <a href="https://github.com/sharrods/multi-cloud-voip-lab">github.com/sharrods/multi-cloud-voip-lab</a> ·
+    <a href="https://sharrods.github.io">sharrods.github.io</a>
+  </p>
+  <p style="margin-top:6px;opacity:0.4;font-size:0.62rem;">Built to break things safely. Learned to fix them under pressure.</p>
+</footer>
+
+</body>
+</html>
