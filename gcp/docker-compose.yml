@@ -1,0 +1,207 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - sbc-network
+    restart: unless-stopped
+
+  rtpengine:
+    image: drachtio/rtpengine:latest
+    container_name: rtpengine
+    network_mode: host
+    privileged: true
+    volumes:
+      - /proc:/proc
+      - ./rtpengine.conf:/etc/rtpengine.conf
+    environment:
+      - INTERFACE=ens4!${PUBLIC_IP}
+    restart: unless-stopped
+    entrypoint: ["/usr/local/bin/rtpengine"]
+    command:
+      - "--interface=10.128.0.4!34.172.210.177"
+      - "--listen-ng=127.0.0.1:2223"
+      - "--port-min=10000"
+      - "--port-max=20000"
+      - "--log-level=6"
+      - "--no-fallback"
+      - "--foreground"
+      - "--log-stderr"
+      - "--table=-1"
+
+  freeswitch:
+    image: safarov/freeswitch:latest
+    container_name: freeswitch
+    network_mode: host
+    privileged: true
+    volumes:
+      - ./freeswitch/conf:/etc/freeswitch:rw
+      - ./freeswitch/sounds:/usr/share/freeswitch/sounds:ro
+      - ./freeswitch/recordings:/var/lib/freeswitch/recordings:rw
+      - ./freeswitch/storage:/var/lib/freeswitch/storage:rw
+      - freeswitch-db:/var/lib/freeswitch/db
+    environment:
+      - SOUND_RATES=8000:16000:32000:48000
+    restart: unless-stopped
+    depends_on:
+      - rtpengine
+
+  opensips:
+    image: opensips/opensips:3.4
+    container_name: opensips
+    network_mode: host
+    depends_on:
+      - redis
+      - rtpengine
+      - freeswitch
+    volumes:
+      - ./opensips/opensips.cfg:/etc/opensips/opensips.cfg:ro
+      - ./opensips/tls:/etc/opensips/tls:ro
+      - ./opensips/db:/var/lib/opensips:rw
+    environment:
+      - PUBLIC_IP=${PUBLIC_IP}
+      - PROVIDER_IP=${PROVIDER_IP}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - FREESWITCH_IP=10.128.0.4
+      - FREESWITCH_PORT=5080
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    # FIXED: Changed to sbc-network so Prometheus can reach it
+    networks:
+      - sbc-network
+    ports:
+      - "9100:9100"
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    restart: unless-stopped
+
+  opensips-exporter:
+    build: ./monitoring/opensips-exporter
+    container_name: opensips-exporter
+    # FIXED: Changed to sbc-network + expose port
+    networks:
+      - sbc-network
+    ports:
+      - "9153:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    depends_on:
+      - opensips
+
+  rtpengine-exporter:
+    build: ./monitoring/rtpengine-exporter
+    container_name: rtpengine-exporter
+    ports:
+      - "9092:9092"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - sbc-network
+    restart: unless-stopped
+    depends_on:
+      - rtpengine
+
+  freeswitch-exporter:
+    build: ./monitoring/freeswitch-exporter
+    container_name: freeswitch-exporter
+    # FIXED: Changed to sbc-network + expose port
+    networks:
+      - sbc-network
+    ports:
+      - "9282:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    depends_on:
+      - freeswitch
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - sbc-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/provisioning/dashboards.yml:/etc/grafana/provisioning/dashboards.yml:ro
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - sbc-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - sbc-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  web-ui:
+    build: ./web-ui
+    container_name: web-ui
+    ports:
+      - "8080:80"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - OPENSIPS_DB=/data/opensips/opensips.db
+    volumes:
+      - ./web-ui/src:/var/www/html
+      - ./opensips/db:/data/opensips:ro
+    networks:
+      - sbc-network
+    depends_on:
+      - redis
+      - opensips
+    restart: unless-stopped
+
+networks:
+  sbc-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  freeswitch-db:
