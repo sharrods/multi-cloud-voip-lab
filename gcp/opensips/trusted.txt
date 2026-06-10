@@ -1,0 +1,3 @@
+# Trusted sources — one IP per line
+127.0.0.1           # FreeSWITCH (local)
+10.128.0.0/20       # GCP subnet
