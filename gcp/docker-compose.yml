@@ -22,7 +22,7 @@ services:
     restart: unless-stopped
     entrypoint: ["/usr/local/bin/rtpengine"]
     command:
-      - "--interface=10.128.0.4!34.172.210.177"
+      - "--interface=10.128.0.4!34.44.206.214"
       - "--listen-ng=127.0.0.1:2223"
       - "--port-min=10000"
       - "--port-max=20000"

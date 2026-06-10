@@ -293,7 +293,7 @@
        If unspecified, the bind_server_ip value is used.
        Used by: sofia.conf.xml dingaling.conf.xml
   -->
-  <X-PRE-PROCESS cmd="set" data="external_rtp_ip=34.44.206.214"/>
+  <X-PRE-PROCESS cmd="set" data="external_rtp_ip=10.128.0.4"/>
 
   <!-- external_sip_ip
       Used as the public IP address for SDP.
@@ -306,7 +306,7 @@
        If unspecified, the bind_server_ip value is used.
        Used by: sofia.conf.xml dingaling.conf.xml
   -->
-  <X-PRE-PROCESS cmd="set" data="external_sip_ip=34.44.206.214"/>
+  <X-PRE-PROCESS cmd="set" data="external_sip_ip=10.128.0.4"/>
 
 
 

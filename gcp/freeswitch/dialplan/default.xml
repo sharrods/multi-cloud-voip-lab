@@ -45,7 +45,7 @@
         <action application="sleep" data="1000"/>
         <action application="set" data="hangup_after_bridge=true"/>
         <action application="set" data="continue_on_fail=true"/>
-        <action application="bridge" data="user/$1@$${domain}"/>
+        <action application="bridge" data="sofia/internal/sip:$1@10.128.0.4:5060"/>
         <action application="voicemail" data="default $${domain} $1"/>
       </condition>
     </extension>
