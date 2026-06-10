@@ -9,6 +9,12 @@ gcp_host := "sharrods@34.44.206.214"
 gcp_key  := "~/.ssh/google_compute_engine"
 gcp_dir  := "~/multi-cloud-voip-lab/gcp"
 
+gcp-branch branch:
+    git -C ~/multi-cloud-voip-lab checkout main
+    git -C ~/multi-cloud-voip-lab pull
+    git -C ~/multi-cloud-voip-lab checkout -b {{branch}}
+    @echo "On {{branch}}. Run 'just gcp-sync' to pull the current GCP state as your baseline."
+
 gcp-sync:
     rsync -avz -e "ssh -i {{gcp_key}}" \
         {{gcp_host}}:~/voiplab/opensips/ \
