@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<include>
+  <context name="default">
+
+    <extension name="echo_test">
+      <condition field="destination_number" expression="^9196$">
+        <action application="answer"/>
+        <action application="playback" data="ivr/ivr-you_are_about_to_enter_echo_test.wav"/>
+        <action application="echo"/>
+      </condition>
+    </extension>
+
+    <extension name="delay_echo">
+      <condition field="destination_number" expression="^9197$">
+        <action application="answer"/>
+        <action application="delay_echo" data="5000"/>
+      </condition>
+    </extension>
+
+    <extension name="hold_music">
+      <condition field="destination_number" expression="^9664$">
+        <action application="answer"/>
+        <action application="playback" data="local_stream://moh"/>
+      </condition>
+    </extension>
+
+    <extension name="conference">
+      <condition field="destination_number" expression="^(9888|3\d{3})$">
+        <action application="answer"/>
+        <action application="conference" data="$1@default"/>
+      </condition>
+    </extension>
+
+    <extension name="check_voicemail">
+      <condition field="destination_number" expression="^\*97$">
+        <action application="answer"/>
+        <action application="sleep" data="1000"/>
+        <action application="voicemail" data="check default $${domain}"/>
+      </condition>
+    </extension>
+
+    <extension name="local_extensions">
+      <condition field="destination_number" expression="^(1\d{3})$">
+        <action application="answer"/>
+        <action application="sleep" data="1000"/>
+        <action application="set" data="hangup_after_bridge=true"/>
+        <action application="set" data="continue_on_fail=true"/>
+        <action application="bridge" data="user/$1@$${domain}"/>
+        <action application="voicemail" data="default $${domain} $1"/>
+      </condition>
+    </extension>
+
+    <extension name="rtt_lab_receiver">
+      <condition field="destination_number" expression="^9200$">
+        <action application="answer"/>
+        <action application="spandsp_detect_tdd"/>
+        <action application="spandsp_inject_tdd"/>
+        <action application="spandsp_send_tdd" data="Hello from FreeSWITCH RTT lab"/>
+        <action application="sleep" data="1000"/>
+        <action application="spandsp_send_tdd" data="This is T.140 text over RTP"/>
+        <action application="sleep" data="1000"/>
+        <action application="spandsp_send_tdd" data="RFC 4103 RED redundancy encoding active"/>
+        <action application="sleep" data="2000"/>
+        <action application="park"/>
+      </condition>
+    </extension>
+    <extension name="catchall">
+      <condition field="destination_number" expression="^.*$">
+        <action application="log" data="INFO No match for $1"/>
+        <action application="answer"/>
+        <action application="playback" data="ivr/ivr-no_user_response.wav"/>
+        <action application="hangup"/>
+      </condition>
+    </extension>
+
+  </context>
+
+  <context name="public">
+    <extension name="public_extensions">
+      <condition field="destination_number" expression="^(.*)$">
+        <action application="set" data="domain_name=$${domain}"/>
+        <action application="transfer" data="$1 XML default"/>
+      </condition>
+    </extension>
+  </context>
+
+</include>

@@ -1,0 +1,24 @@
+<include>
+  <user id="1001">
+    <params>
+      <param name="password" value="Pass1001!"/>
+      <param name="vm-password" value="1001"/>
+      <param name="vm-mailto" value="user1001@example.com"/>
+      <param name="vm-email-all-messages" value="true"/>
+      <param name="vm-attach-file" value="true"/>
+      <param name="vm-keep-local-after-email" value="true"/>
+    </params>
+    <variables>
+      <variable name="toll_allow" value="domestic,international,local"/>
+      <variable name="accountcode" value="1001"/>
+      <variable name="user_context" value="default"/>
+      <variable name="effective_caller_id_name" value="Extension 1001"/>
+      <variable name="effective_caller_id_number" value="1001"/>
+      <variable name="outbound_caller_id_name" value="SBC User 1001"/>
+      <variable name="outbound_caller_id_number" value="1001"/>
+      <variable name="callgroup" value="support"/>
+      <variable name="max_calls" value="5"/>
+      <variable name="record_calls" value="true"/>
+    </variables>
+  </user>
+</include>

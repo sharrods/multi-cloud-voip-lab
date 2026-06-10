@@ -1,0 +1,19 @@
+<include>
+  <context name="default">
+    <extension name="rtt_lab_receiver">
+      <condition field="destination_number" expression="^9200$">
+        <action application="set" data="rtp_payload_number=96"/>
+        <action application="set" data="rtp_payload_number_red=100"/>
+        <action application="spandsp_detect_tdd"/>
+        <action application="spandsp_inject_tdd"/>
+        <action application="spandsp_send_tdd" data="Hello from FreeSWITCH RTT lab"/>
+        <action application="sleep" data="1000"/>
+        <action application="spandsp_send_tdd" data="This is T.140 text over RTP"/>
+        <action application="sleep" data="1000"/>
+        <action application="spandsp_send_tdd" data="RFC 4103 RED redundancy encoding active"/>
+        <action application="sleep" data="2000"/>
+        <action application="park"/>
+      </condition>
+    </extension>
+  </context>
+</include>
