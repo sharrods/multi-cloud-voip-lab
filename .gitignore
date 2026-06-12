@@ -25,6 +25,7 @@ id_rsa*
 .env
 secrets/
 credentials/
+vars_local.xml
 
 # OS
 .DS_Store
