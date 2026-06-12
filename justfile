@@ -22,6 +22,9 @@ gcp-sync:
     rsync -avz -e "ssh -i {{gcp_key}}" \
         {{gcp_host}}:~/voiplab/docker-compose.yml \
         {{gcp_dir}}/docker-compose.yml
+    rsync -avz -e "ssh -i {{gcp_key}}" \
+        {{gcp_host}}:~/voiplab/freeswitch/conf/ \
+        {{gcp_dir}}/freeswitch/
     @echo "GCP -> Azure sync complete. Run 'just gcp-diff' to review changes."
 
 gcp-diff:
