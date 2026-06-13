@@ -22,7 +22,7 @@ def collect_metrics():
     rtpengine_up.set(1 if logs else 0)
     
     if logs:
-        creating = logs.count('Creating call')
+        creating = logs.count('Creating new call')
         closing = logs.count('Final packet stats')
         rtpengine_sessions.set(max(0, creating - closing))
         rtpengine_calls_total.set(creating)
