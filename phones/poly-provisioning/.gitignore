@@ -1,0 +1,8 @@
+# Provisioning login - created on the laptop only, never committed
+.htpasswd
+
+# Files the phone uploads to the provisioning server
+phone-logs/*
+!phone-logs/.gitkeep
+phone-overrides/*
+!phone-overrides/.gitkeep

@@ -1,0 +1,21 @@
+# Poly VVX 501 provisioning server for the VoIP lab.
+# Runs on the LAPTOP (10.0.0.163), not on Azure.
+# One nginx container that serves the phone's config files over HTTP on port 80.
+#
+# Before the first start, create .htpasswd in this folder (on the laptop).
+# If .htpasswd is missing, Docker creates an empty FOLDER with that name
+# and nginx will not start.
+
+services:
+  poly-provisioning:
+    image: nginx:stable-alpine
+    container_name: poly-provisioning
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./.htpasswd:/etc/nginx/.htpasswd:ro
+      - ./configs:/srv/provisioning:ro
+      - ./phone-logs:/srv/phone-logs
+      - ./phone-overrides:/srv/phone-overrides
+    restart: unless-stopped
